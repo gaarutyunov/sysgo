@@ -1,0 +1,18 @@
+{{ template "header" . }}
+{{- with .Port }}
+// {{ .Name }}Impl is a driven adapter implementing the {{ .Name }} port.
+// This scaffold is written once; implement the persistence logic here.
+type {{ .Name }}Impl struct{}
+
+var _ {{ $.PortOutPkg }}.{{ .Name }} = (*{{ .Name }}Impl)(nil)
+
+// New{{ .Name }}Impl constructs the adapter. Inject your DB handle here.
+func New{{ .Name }}Impl() *{{ .Name }}Impl {
+	return &{{ .Name }}Impl{}
+}
+{{ range .Methods }}
+func ({{ receiver $.Port.Name }} *{{ $.Port.Name }}Impl) {{ sig . }} {
+	{{ zeroReturn . }}
+}
+{{ end }}
+{{- end }}

@@ -1,0 +1,22 @@
+# Example overlay for the Order context. Apply it by adding to sysgo.yaml:
+#
+#   overlay:
+#     path: ./overlay.yaml
+#
+# Overlays patch the model JSON before IR build, so you can steer generation
+# without editing the source model.
+overlay: 1.0.0
+info:
+  title: Orders Go overlay
+  version: 1.0.0
+actions:
+  # Force a concrete Go type for the Money value object's amount.
+  - target: $[?(@.declaredName=='amount')]
+    update:
+      x-go-type: "decimal.Decimal"
+      x-go-type-import: "github.com/shopspring/decimal"
+
+  # Reclassify PaymentPort explicitly as a driven (outbound) gateway port.
+  - target: byName:PaymentPort
+    update:
+      x-ddd-stereotype: "driven-port"

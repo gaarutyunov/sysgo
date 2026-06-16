@@ -1,0 +1,11 @@
+{{ template "header" . }}
+{{- with .Entity }}
+// {{ .Name }} is an aggregate root. It is the consistency boundary for its
+// contained entities and value objects; mutate it only through its methods.
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ if .Doc }}// {{ .Doc }}
+	{{ end }}{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+{{- end }}

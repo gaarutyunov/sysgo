@@ -1,0 +1,94 @@
+[
+  {
+    "@id": "pkg-order",
+    "@type": "Package",
+    "declaredName": "OrderContext",
+    "ownedElement": [
+      { "@id": "def-money" },
+      { "@id": "def-charge" },
+      { "@id": "def-receipt" },
+      { "@id": "port-payment" },
+      { "@id": "port-order-repo" },
+      { "@id": "def-order" },
+      { "@id": "def-lineitem" },
+      { "@id": "act-placeorder" }
+    ]
+  },
+
+  {
+    "@id": "def-money",
+    "@type": "AttributeDefinition",
+    "declaredName": "Money",
+    "documentation": "A monetary amount in a given currency.",
+    "ownedElement": [{ "@id": "money-amount" }, { "@id": "money-currency" }]
+  },
+  { "@id": "money-amount", "@type": "AttributeUsage", "declaredName": "amount", "type": "Real" },
+  { "@id": "money-currency", "@type": "AttributeUsage", "declaredName": "currency", "type": "String" },
+
+  {
+    "@id": "def-charge",
+    "@type": "ItemDefinition",
+    "declaredName": "ChargeRequest",
+    "ownedElement": [{ "@id": "charge-amount" }]
+  },
+  { "@id": "charge-amount", "@type": "AttributeUsage", "declaredName": "amount", "type": "Real" },
+
+  {
+    "@id": "def-receipt",
+    "@type": "ItemDefinition",
+    "declaredName": "Receipt",
+    "ownedElement": [{ "@id": "receipt-id" }]
+  },
+  { "@id": "receipt-id", "@type": "AttributeUsage", "declaredName": "id", "type": "String" },
+
+  {
+    "@id": "port-payment",
+    "@type": "PortDefinition",
+    "declaredName": "PaymentPort",
+    "ownedElement": [{ "@id": "pay-charge" }, { "@id": "pay-receipt" }]
+  },
+  { "@id": "pay-charge", "@type": "ItemUsage", "declaredName": "charge", "direction": "out", "type": "ChargeRequest" },
+  { "@id": "pay-receipt", "@type": "ItemUsage", "declaredName": "receipt", "direction": "in", "type": "Receipt" },
+
+  {
+    "@id": "port-order-repo",
+    "@type": "PortDefinition",
+    "declaredName": "OrderRepository",
+    "x-ddd-stereotype": "driven-port",
+    "ownedElement": [{ "@id": "repo-save" }]
+  },
+  { "@id": "repo-save", "@type": "ItemUsage", "declaredName": "order", "direction": "in", "type": "Order" },
+
+  {
+    "@id": "def-order",
+    "@type": "PartDefinition",
+    "declaredName": "Order",
+    "documentation": "The Order aggregate root.",
+    "ownedElement": [
+      { "@id": "order-id" },
+      { "@id": "order-total" },
+      { "@id": "order-lines" }
+    ]
+  },
+  { "@id": "order-id", "@type": "AttributeUsage", "declaredName": "id", "type": "String" },
+  { "@id": "order-total", "@type": "AttributeUsage", "declaredName": "total", "type": "Money" },
+  { "@id": "order-lines", "@type": "PartUsage", "declaredName": "lines", "type": "LineItem", "upperBound": "*" },
+
+  {
+    "@id": "def-lineitem",
+    "@type": "PartDefinition",
+    "declaredName": "LineItem",
+    "ownedElement": [{ "@id": "li-sku" }, { "@id": "li-qty" }]
+  },
+  { "@id": "li-sku", "@type": "AttributeUsage", "declaredName": "sku", "type": "String" },
+  { "@id": "li-qty", "@type": "AttributeUsage", "declaredName": "qty", "type": "Integer" },
+
+  {
+    "@id": "act-placeorder",
+    "@type": "ActionDefinition",
+    "declaredName": "PlaceOrder",
+    "documentation": "Places a new order.",
+    "ownedElement": [{ "@id": "po-order" }]
+  },
+  { "@id": "po-order", "@type": "ItemUsage", "declaredName": "order", "direction": "in", "type": "Order" }
+]

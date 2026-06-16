@@ -1,0 +1,12 @@
+{{- define "header" -}}
+{{ .Marker }}
+
+package {{ .Package }}
+{{ if .Imports }}
+import (
+{{- range .Imports }}
+	{{ if .Alias }}{{ .Alias }} {{ end }}"{{ .Path }}"
+{{- end }}
+)
+{{ end -}}
+{{- end -}}

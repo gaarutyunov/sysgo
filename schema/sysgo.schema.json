@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/gaarutyunov/sysgo/main/schema/sysgo.schema.json",
+  "title": "sysgo configuration",
+  "type": "object",
+  "required": ["module"],
+  "additionalProperties": false,
+  "properties": {
+    "module": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base-url", "project"],
+          "properties": {
+            "base-url": { "type": "string" },
+            "project": { "type": "string" },
+            "commit": { "type": "string" }
+          }
+        },
+        "file": { "type": "string" }
+      }
+    },
+    "overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "path": { "type": "string" } }
+    },
+    "generate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "type": "boolean" },
+        "usecases": { "type": "boolean" },
+        "ports": { "type": "boolean" },
+        "adapters": { "type": "string", "enum": ["off", "scaffold", "full"] },
+        "events": { "type": "boolean" },
+        "tests": { "type": "boolean" },
+        "importlint": { "type": "boolean" }
+      }
+    },
+    "ports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "driven-dir": { "type": "string" },
+        "driving-dir": { "type": "string" },
+        "repository-in-domain": { "type": "boolean" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dir": { "type": "string" },
+          "package": { "type": "string" }
+        }
+      }
+    },
+    "type-mapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string" },
+          "import": { "type": "string" }
+        }
+      }
+    },
+    "import-mapping": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "additional-imports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["package"],
+        "properties": {
+          "package": { "type": "string" },
+          "alias": { "type": "string" }
+        }
+      }
+    },
+    "output-options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user-templates": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "skip-fmt": { "type": "boolean" },
+        "skip-prune": { "type": "boolean" },
+        "generated-marker": { "type": "string" }
+      }
+    }
+  }
+}

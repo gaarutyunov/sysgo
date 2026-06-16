@@ -1,0 +1,18 @@
+{{ template "header" . }}
+{{- with .Service }}
+// {{ .Name }}Impl is a scaffold implementation of {{ .Name }}. Fill in the
+// business rules; sysgo will not overwrite this file.
+type {{ .Name }}Impl struct{}
+
+var _ {{ .Name }} = (*{{ .Name }}Impl)(nil)
+
+// New{{ .Name }} constructs the default {{ .Name }} implementation.
+func New{{ .Name }}() *{{ .Name }}Impl {
+	return &{{ .Name }}Impl{}
+}
+{{ range .Methods }}
+func ({{ receiver $.Service.Name }} *{{ $.Service.Name }}Impl) {{ sig . }} {
+	{{ zeroReturn . }}
+}
+{{ end }}
+{{- end }}

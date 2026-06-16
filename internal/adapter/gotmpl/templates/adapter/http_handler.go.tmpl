@@ -1,0 +1,18 @@
+{{ template "header" . }}
+{{- with .Port }}
+// {{ .Name }}Handler is a driving adapter that exposes the {{ .Name }} port over
+// HTTP. This scaffold is written once; wire your router and decode requests here.
+type {{ .Name }}Handler struct {
+	uc {{ $.PortInPkg }}.{{ .Name }}
+}
+
+// New{{ .Name }}Handler constructs the handler with its driving port.
+func New{{ .Name }}Handler(uc {{ $.PortInPkg }}.{{ .Name }}) *{{ .Name }}Handler {
+	return &{{ .Name }}Handler{uc: uc}
+}
+
+// ServeHTTP handles an inbound request for the {{ .Name }} port.
+func ({{ receiver .Name }} *{{ .Name }}Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
+}
+{{- end }}

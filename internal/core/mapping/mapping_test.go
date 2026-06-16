@@ -115,6 +115,58 @@ func TestOptionalPointerAndMany(t *testing.T) {
 	}
 }
 
+// TestCanonicalGraphResolution exercises the real SysML JSON form: types are
+// resolved via FeatureTyping references (by @id), multiplicity via a
+// MultiplicityRange with a LiteralInfinity, and library elements are skipped.
+func TestCanonicalGraphResolution(t *testing.T) {
+	raw := []map[string]any{
+		{"@id": "pkg", "@type": "Package", "declaredName": "Ctx",
+			"ownedRelationship": []any{ref("m1"), ref("m2")}},
+		{"@id": "m1", "@type": "OwningMembership", "ownedRelatedElement": []any{ref("order")}},
+		{"@id": "m2", "@type": "LibraryPackage", "declaredName": "ScalarValues", "isLibraryElement": true,
+			"ownedRelationship": []any{ref("ms")}},
+		{"@id": "ms", "@type": "OwningMembership", "ownedRelatedElement": []any{ref("strType")}},
+		{"@id": "strType", "@type": "DataType", "declaredName": "String", "isLibraryElement": true},
+
+		{"@id": "order", "@type": "PartDefinition", "declaredName": "Order",
+			"ownedRelationship": []any{ref("fm1"), ref("fm2")}},
+		{"@id": "fm1", "@type": "FeatureMembership", "ownedRelatedElement": []any{ref("idf")}},
+		{"@id": "idf", "@type": "AttributeUsage", "declaredName": "id",
+			"ownedRelationship": []any{ref("ft1")}},
+		{"@id": "ft1", "@type": "FeatureTyping", "type": ref("strType")},
+
+		{"@id": "fm2", "@type": "FeatureMembership", "ownedRelatedElement": []any{ref("linesf")}},
+		{"@id": "linesf", "@type": "PartUsage", "declaredName": "lines",
+			"ownedRelationship": []any{ref("ft2"), ref("om2")}},
+		{"@id": "ft2", "@type": "FeatureTyping", "type": ref("order")},
+		{"@id": "om2", "@type": "OwningMembership", "ownedRelatedElement": []any{ref("mr")}},
+		{"@id": "mr", "@type": "MultiplicityRange", "ownedRelationship": []any{ref("om3")}},
+		{"@id": "om3", "@type": "OwningMembership", "ownedRelatedElement": []any{ref("inf")}},
+		{"@id": "inf", "@type": "LiteralInfinity"},
+	}
+	g, _ := model.Build(raw)
+	proj, _ := New(baseCfg()).Build(g)
+	if len(proj.Contexts) != 1 {
+		t.Fatalf("expected 1 context (library skipped), got %d", len(proj.Contexts))
+	}
+	ctx := proj.Contexts[0]
+	if len(ctx.Entities) != 1 {
+		t.Fatalf("expected Order entity, got %+v", ctx)
+	}
+	fields := map[string]string{}
+	for _, f := range ctx.Entities[0].Fields {
+		fields[f.Name] = f.GoType
+	}
+	if fields["ID"] != "string" {
+		t.Fatalf("FeatureTyping scalar resolution failed: %q", fields["ID"])
+	}
+	if fields["Lines"] != "[]Order" {
+		t.Fatalf("MultiplicityRange many resolution failed: %q", fields["Lines"])
+	}
+}
+
+func ref(id string) map[string]any { return map[string]any{"@id": id} }
+
 func TestUseCaseAndDrivingPort(t *testing.T) {
 	raw := []map[string]any{
 		{"@id": "p", "@type": "Package", "declaredName": "Ctx",

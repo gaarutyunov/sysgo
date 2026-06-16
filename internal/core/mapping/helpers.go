@@ -94,7 +94,7 @@ func (m *Mapper) resolveGoType(u *model.Element, meta ir.Metadata) (string, stri
 	if meta.GoType != "" {
 		return meta.GoType, ""
 	}
-	qn := typeName(u)
+	qn := m.typeName(u)
 	if qn == "" {
 		return "any", ""
 	}
@@ -123,22 +123,75 @@ func (m *Mapper) resolveGoType(u *model.Element, meta ir.Metadata) (string, stri
 }
 
 // typeName extracts the SysML qualified type name referenced by a typed feature.
-func typeName(u *model.Element) string {
+// It supports the simplified inline form ("type": "String") and the canonical
+// graph form (a FeatureTyping relationship whose "type" references the type
+// element by @id).
+func (m *Mapper) typeName(u *model.Element) string {
 	if t := u.StringAttr("type"); t != "" {
 		return t
 	}
 	if t := u.StringAttr("declaredType"); t != "" {
 		return t
 	}
-	// Resolve a FeatureTyping relationship: child rel with a "type" reference.
-	for _, c := range u.Owned {
-		if strings.Contains(c.Type, "Typing") || strings.Contains(c.Type, "Specialization") {
-			if t := c.StringAttr("typeName"); t != "" {
-				return t
+	// Canonical form: resolve the FeatureTyping relationship's type reference.
+	for _, relID := range refList(u.Raw["ownedRelationship"]) {
+		rel := m.elem(relID)
+		if rel == nil || !strings.Contains(rel.Type, "FeatureTyping") {
+			continue
+		}
+		if tid := refID(rel.Raw["type"]); tid != "" {
+			if te := m.elem(tid); te != nil {
+				return te.QualifiedName()
 			}
 		}
 	}
 	return ""
+}
+
+// elem dereferences an element @id against the graph.
+func (m *Mapper) elem(id string) *model.Element {
+	if m.g == nil {
+		return nil
+	}
+	return m.g.Elements[id]
+}
+
+// isLibrary reports whether an element belongs to the standard library and so
+// must not be generated (only used for type resolution).
+func isLibrary(e *model.Element) bool {
+	return e.Type == "LibraryPackage" || e.BoolAttr("isLibraryElement")
+}
+
+// refID extracts an @id from a {"@id": "..."} reference or bare string.
+func refID(v any) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case map[string]any:
+		if s, ok := t["@id"].(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// refList normalizes a reference field into a slice of ids.
+func refList(v any) []string {
+	switch t := v.(type) {
+	case []any:
+		out := make([]string, 0, len(t))
+		for _, item := range t {
+			if id := refID(item); id != "" {
+				out = append(out, id)
+			}
+		}
+		return out
+	default:
+		if id := refID(v); id != "" {
+			return []string{id}
+		}
+	}
+	return nil
 }
 
 func baseName(qn string) string {
@@ -172,6 +225,9 @@ func isOptional(u *model.Element) bool {
 	if u.BoolAttr("optional") || u.BoolAttr("isOptional") {
 		return true
 	}
+	if opt, _, ok := multiplicity(u); ok {
+		return opt
+	}
 	if v, ok := u.Attr("lowerBound"); ok {
 		return asInt(v) == 0
 	}
@@ -182,6 +238,9 @@ func isMany(u *model.Element) bool {
 	if u.BoolAttr("many") || u.BoolAttr("isMany") {
 		return true
 	}
+	if _, many, ok := multiplicity(u); ok {
+		return many
+	}
 	if v, ok := u.Attr("upperBound"); ok {
 		switch t := v.(type) {
 		case string:
@@ -191,6 +250,59 @@ func isMany(u *model.Element) bool {
 		}
 	}
 	return false
+}
+
+// multiplicity inspects a feature's owned MultiplicityRange (canonical form),
+// returning (optional, many, found). A plain Multiplicity (default 1..1) is
+// ignored. Bounds are LiteralInteger values or a LiteralInfinity ("*").
+func multiplicity(u *model.Element) (optional, many, found bool) {
+	for _, c := range u.Owned {
+		if !strings.HasSuffix(c.Type, "MultiplicityRange") {
+			continue
+		}
+		bounds := collectBounds(c)
+		switch len(bounds) {
+		case 0:
+			return false, false, true
+		case 1:
+			b := bounds[0]
+			return false, b.inf || b.val > 1, true
+		default:
+			lo, hi := bounds[0], bounds[len(bounds)-1]
+			optional = !lo.inf && lo.val == 0
+			many = hi.inf || hi.val > 1
+			return optional, many, true
+		}
+	}
+	return false, false, false
+}
+
+type bound struct {
+	val int
+	inf bool
+}
+
+// collectBounds gathers the literal bounds owned by a MultiplicityRange in
+// document order (descending through memberships one level if needed).
+func collectBounds(mr *model.Element) []bound {
+	var out []bound
+	var visit func(e *model.Element, depth int)
+	visit = func(e *model.Element, depth int) {
+		for _, c := range e.Owned {
+			switch {
+			case strings.HasSuffix(c.Type, "LiteralInfinity"):
+				out = append(out, bound{inf: true})
+			case strings.HasSuffix(c.Type, "LiteralInteger"):
+				out = append(out, bound{val: asInt(c.Raw["value"])})
+			default:
+				if depth < 2 {
+					visit(c, depth+1)
+				}
+			}
+		}
+	}
+	visit(mr, 0)
+	return out
 }
 
 func asInt(v any) int {

@@ -27,6 +27,7 @@ type Diagnostic struct {
 type Mapper struct {
 	Cfg         *config.Config
 	Diagnostics []Diagnostic
+	g           *model.Graph
 }
 
 // New returns a Mapper bound to cfg.
@@ -34,6 +35,7 @@ func New(cfg *config.Config) *Mapper { return &Mapper{Cfg: cfg} }
 
 // Build implements port.Builder.
 func (m *Mapper) Build(g *model.Graph) (*ir.Project, error) {
+	m.g = g
 	p := &ir.Project{Module: m.Cfg.Module}
 	for _, root := range g.Roots {
 		m.collectContexts(root, p)
@@ -58,7 +60,12 @@ func (m *Mapper) Build(g *model.Graph) (*ir.Project, error) {
 
 // collectContexts walks the tree creating a Context per Package.
 func (m *Mapper) collectContexts(e *model.Element, p *ir.Project) {
-	if e.Type == "Package" || e.Type == "LibraryPackage" {
+	// Standard-library content (e.g. ScalarValues) is used for type resolution
+	// but never generated as a bounded context.
+	if isLibrary(e) {
+		return
+	}
+	if e.Type == "Package" {
 		ctx := &ir.Context{
 			Name:    gocode.GoName(e.DeclaredName),
 			Package: defaultPkg(e.DeclaredName),
@@ -87,6 +94,9 @@ func (m *Mapper) collectContexts(e *model.Element, p *ir.Project) {
 
 // classify maps a single element into the context per stereotype/heuristic.
 func (m *Mapper) classify(e *model.Element, ctx *ir.Context) {
+	if isLibrary(e) {
+		return
+	}
 	meta := m.resolveMeta(e)
 	switch e.Type {
 	case "PartDefinition":

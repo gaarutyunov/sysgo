@@ -93,3 +93,40 @@ jobs:
         run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
       - name: Scan dependencies
         run: osv-scanner scan source --recursive .
+
+  sysml-pipeline:
+    name: SysML → JSON → Generate
+    runs-on: ubuntu-latest
+    env:
+      PILOT_RELEASE: "2026-04"
+      KERNEL_VERSION: "0.59.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Cache SysML Pilot kernel
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sysml
+          key: sysml-pilot-${{ env.PILOT_RELEASE }}-${{ env.KERNEL_VERSION }}
+      - name: Transform real .sysml to JSON with the Pilot serializer
+        run: |
+          cp -r examples/order "${RUNNER_TEMP}/ex"
+          scripts/sysml2json.sh "${RUNNER_TEMP}/ex/OrderContext.sysml" "${RUNNER_TEMP}/ex/model.json"
+      - name: Generate from committed JSON and from freshly transformed JSON
+        run: |
+          go run ./cmd/sysgo generate -c examples/order/sysgo.yaml --out "${RUNNER_TEMP}/committed"
+          go run ./cmd/sysgo generate -c "${RUNNER_TEMP}/ex/sysgo.yaml" --out "${RUNNER_TEMP}/fresh"
+      - name: Assert committed JSON is in sync with the .sysml source of truth
+        run: diff -r "${RUNNER_TEMP}/committed" "${RUNNER_TEMP}/fresh"
+      - name: Build the generated project
+        run: |
+          cd "${RUNNER_TEMP}/fresh"
+          printf 'module github.com/acme/orders\n\ngo 1.24\n' > go.mod
+          go build ./...

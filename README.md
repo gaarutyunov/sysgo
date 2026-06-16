@@ -29,6 +29,31 @@ Try it against the bundled example:
 sysgo generate -c examples/order/sysgo.yaml --out ./out
 ```
 
+## From SysML source to Go
+
+sysgo consumes the **SysML v2 API JSON**. You author models in the SysML v2
+**textual notation** (`.sysml`) and transform them to that JSON with real SysML
+tooling first — the JSON is an intermediate, not something you hand-write:
+
+```bash
+# .sysml ──[ OMG SysML v2 Pilot serializer ]──▶ model.json ──[ sysgo ]──▶ Go
+scripts/sysml2json.sh examples/order/OrderContext.sysml examples/order/model.json
+sysgo generate -c examples/order/sysgo.yaml --out ./out
+```
+
+`scripts/sysml2json.sh` (also `make model`) drives the OMG **SysML v2 Pilot
+Implementation** serializer (`org.omg.sysml.xtext.util.SysML2JSON`), which
+parses the textual notation against the standard libraries and emits the
+`{payload, …}` element envelope. It requires Java 17+ and `curl`, and caches the
+pilot distribution under `~/.cache/sysml`. The example ships both the real
+source ([`examples/order/OrderContext.sysml`](./examples/order/OrderContext.sysml))
+and the tool-produced intermediate (`examples/order/model.json`); CI regenerates
+the JSON from source and asserts the generated Go is unchanged.
+
+Already have JSON from the SysML v2 REST API or another export? Point
+`source.file` (or `source.api`) at it directly — element @ids differ between
+tool runs but sysgo's output does not depend on them.
+
 ## How it works
 
 ```

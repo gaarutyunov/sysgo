@@ -1,4 +1,4 @@
-.PHONY: build test cover lint fmt generate-example clean
+.PHONY: build test cover lint fmt model generate-example clean
 
 build:
 	go build ./...
@@ -16,6 +16,11 @@ lint:
 
 fmt:
 	gofmt -w $(shell find . -name '*.go' -not -path './examples/*')
+
+# Transform the real .sysml source to the JSON intermediate using real SysML
+# tooling (the OMG Pilot Implementation serializer). Requires Java + curl.
+model:
+	scripts/sysml2json.sh examples/order/OrderContext.sysml examples/order/model.json
 
 generate-example:
 	go run ./cmd/sysgo generate -c examples/order/sysgo.yaml --out ./out

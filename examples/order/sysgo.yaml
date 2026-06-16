@@ -2,6 +2,8 @@
 module: github.com/acme/orders
 
 source:
+  # model.json is produced from OrderContext.sysml by real SysML tooling:
+  #   scripts/sysml2json.sh examples/order/OrderContext.sysml examples/order/model.json
   file: ./model.json
 
 generate:

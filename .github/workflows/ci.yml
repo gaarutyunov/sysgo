@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25.11"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -128,5 +128,5 @@ jobs:
       - name: Build the generated project
         run: |
           cd "${RUNNER_TEMP}/fresh"
-          printf 'module github.com/acme/orders\n\ngo 1.24\n' > go.mod
+          printf 'module github.com/acme/orders\n\ngo 1.25.11\n' > go.mod
           go build ./...

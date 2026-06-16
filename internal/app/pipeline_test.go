@@ -123,7 +123,7 @@ func TestGeneratedCompiles(t *testing.T) {
 	if _, err := pl.Generate(context.Background(), out); err != nil {
 		t.Fatal(err)
 	}
-	gomod := "module github.com/acme/orders\n\ngo 1.24\n"
+	gomod := "module github.com/acme/orders\n\ngo 1.25.11\n"
 	if err := os.WriteFile(filepath.Join(out, "go.mod"), []byte(gomod), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,9 @@
 /dist/
 coverage.out
 *.test
-sysgo
+# The compiled CLI binary at the repo root (anchored so it does not match the
+# cmd/sysgo source directory).
+/sysgo
 
 # Editor/OS
 .DS_Store

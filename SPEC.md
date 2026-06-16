@@ -1,6 +1,6 @@
 # SPEC.md — `sysgo`: A SysML v2 → Go DDD/Hexagonal Code Generator
 
-> Status: **Draft v0.1** · Working name: **`sysgo`** (placeholder — rename freely) · Module: `github.com/gaarutyunov/sysgo`
+> Status: **Draft v0.2** · Working name: **`sysgo`** (placeholder — rename freely) · Module: `github.com/gaarutyunov/sysgo`
 > 
 > `sysgo` ingests a **SysML v2 model**, normalizes it into a **DDD/hexagonal intermediate representation**, and emits a **configurable Go project scaffold** whose layout follows the canonical Evans / Cockburn / Martin architecture. Its UX (config file, templates, overlays) is modeled directly on **oapi-codegen**.
 
@@ -25,7 +25,7 @@ Three properties are non-negotiable:
 
 ### Non-Goals (v1)
 
-- Parsing the SysML v2 **textual notation** directly (no production-grade Go parser exists; we consume the API JSON instead — see §5 and §16).
+- Parsing the SysML v2 **textual notation** *inside `sysgo`* (no production-grade Go parser exists). `sysgo` consumes the API JSON. To start from textual `.sysml` source, transform it to that JSON first with **real SysML tooling** — the repo ships `scripts/sysml2json.sh`, which drives the OMG **SysML v2 Pilot Implementation** serializer (`org.omg.sysml.xtext.util.SysML2JSON`); examples and tests are authored in `.sysml` and converted this way (see §5.1, §17, D-06).
 - Generating runtime behavior/business logic. We generate **structure, signatures, ports, wiring, and stubs**; business rules are filled in by humans.
 - Round-tripping Go → SysML (one-way generation only).
 - Non-Go targets (the IR and a protoc-style plugin boundary keep this open for later — see §13).
@@ -90,6 +90,7 @@ Each stage is an interface (see §13) so the loader, overlay engine, renderer, a
 
 - **API mode (primary).** Point `sysgo` at a SysML v2 API Services base URL + `projectId` + `commitId`. It pages through `GET /projects/{p}/commits/{c}/elements` (and fetches individual elements / runs `POST /query-results` as needed).
 - **File mode (offline).** A pre-exported JSON array of elements (the API’s serialization), e.g. produced by a prior export or a CI artifact.
+- **Textual source via tooling (authoring).** Models are authored in the SysML v2 **textual notation** (`.sysml`) and transformed to the API JSON *before* `sysgo` runs, by real SysML tooling — `sysgo` ingests the JSON, never the text. The canonical path is the OMG **Pilot Implementation** serializer `org.omg.sysml.xtext.util.SysML2JSON` (bundled in the pilot’s Jupyter-kernel distribution), wrapped by `scripts/sysml2json.sh` (`make model`). This is the source of the example/test fixtures (§17). Output element `@id`s are not stable across tool runs, but `sysgo`’s generated output does not depend on them.
 
 > Pin to a specific server/spec version. The published API document and generated clients show version skew (OAS 3.0.1 vs 3.1; `version: 1.0.0`); SysML v2 is still finalizing at OMG. Treat the live server’s document as ground truth.
 
@@ -108,6 +109,13 @@ Each element is a JSON-LD-ish object:
 ```
 
 Containment is **indirect**: an Element owns a **Membership** (`OwningMembership`, `FeatureMembership`, …) via `ownedRelationship`; the membership points to the contained Element via `ownedRelatedElement`. A derived `ownedElement` array, where present, lets us skip the membership hop. Cross-references are always `{"@id": "..."}`.
+
+**Real serialization details the Loader/IR builder accommodate** (validated against the Pilot serializer output):
+
+- **API envelope.** The pilot/REST bulk format wraps each element as `{ "payload": <element>, "identity": {"@id": …} }`. The Loader unwraps `payload`; plain element arrays pass through unchanged.
+- **Typing by reference.** A feature’s type is not a name on the feature but a **`FeatureTyping`** relationship (in its `ownedRelationship`) whose `type` references the type element by `@id`. The IR builder dereferences it to the type’s (qualified) name.
+- **Multiplicity by element.** Bounds are a **`MultiplicityRange`** owned by the feature, holding `LiteralInteger`/`LiteralInfinity` bound elements (a bare `Multiplicity` is the default `1..1`). `*` ⇒ many; lower `0` ⇒ optional.
+- **Library proxies.** Cross-document references to standard-library types (e.g. `ScalarValues::String`) serialize as **anonymous `Type` proxies** unless the referenced library is included in the export. `scripts/sysml2json.sh` therefore bundles the needed library (e.g. `ScalarValues.kerml`) so scalar types emit as named `DataType` elements; library elements are used for type resolution but are never generated.
 
 The Loader resolves this into an in-memory `model.Graph`:
 
@@ -468,6 +476,7 @@ Adopt the goa/ent/protoc convention — **split generated from hand-written** ra
 
 ## 17. Testing Strategy
 
+- **Real-source pipeline:** the example model is authored in `.sysml` (`examples/order/OrderContext.sysml`) and converted to JSON by the **Pilot serializer** in CI. Generation runs from both the committed JSON and a freshly-converted one, asserting **identical generated Go** — a source-of-truth freshness check robust to the serializer’s nondeterministic element `@id`s.
 - **Golden-file tests:** check the OMG/SysON sample models (vehicle, drone) into `examples/`, generate, and diff against committed golden trees; regeneration must be byte-stable and `git diff`-clean.
 - **Unit tests** per stage: membership resolution, overlay application (JSONPath actions), mapping heuristics, type mapping, layout interpolation.
 - **Compile test:** generated golden projects must `go build ./...` (with scaffold stubs returning `errors.New("not implemented")`).
@@ -551,6 +560,7 @@ Adopt the goa/ent/protoc convention — **split generated from hand-written** ra
 - **D-03** Output layout: **bounded-context-first**, four regions, dependencies inward. — *Accepted.*
 - **D-04** Driven-port interfaces default to **Application** (`port/out`); configurable into Domain. — *Accepted (revisit per team).*
 - **D-05** Generated/scaffold-once **file split** over in-file merge regions. — *Accepted.*
+- **D-06** Examples & tests start from real **`.sysml`** textual source, transformed to API JSON by real SysML tooling (OMG Pilot serializer, `scripts/sysml2json.sh`); `sysgo` itself still ingests JSON only (textual parsing stays out of the tool). — *Accepted (revises the §1 non-goal framing).*
 
 -----
 

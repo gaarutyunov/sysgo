@@ -80,12 +80,19 @@ func (c *Config) applyDefaults() {
 		c.OutputOptions.GeneratedMarker = DefaultMarker
 	}
 	if c.Layout == nil {
-		c.Layout = Default().Layout
+		c.Layout = map[string]Region{}
 	}
-	for k, v := range Default().Layout {
-		if _, ok := c.Layout[k]; !ok {
-			c.Layout[k] = v
+	// Add missing regions and backfill empty dir/package fields on regions that
+	// were partially overridden (e.g. `layout: { domain: {} }`).
+	for k, def := range Default().Layout {
+		reg := c.Layout[k]
+		if reg.Dir == "" {
+			reg.Dir = def.Dir
 		}
+		if reg.Package == "" {
+			reg.Package = def.Package
+		}
+		c.Layout[k] = reg
 	}
 }
 

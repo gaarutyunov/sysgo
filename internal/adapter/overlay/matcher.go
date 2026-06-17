@@ -156,7 +156,7 @@ func parseFieldRef(s string) (string, error) {
 
 func parseLiteral(s string) any {
 	s = strings.TrimSpace(s)
-	if len(s) >= 2 && (s[0] == '\'' || s[0] == '"') {
+	if len(s) >= 2 && (s[0] == '\'' || s[0] == '"') && s[len(s)-1] == s[0] {
 		return s[1 : len(s)-1]
 	}
 	switch s {

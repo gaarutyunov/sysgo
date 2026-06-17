@@ -56,7 +56,7 @@ tool runs but sysgo's output does not depend on them.
 
 ## How it works
 
-```
+```text
 SysML v2 ──► Loader ──► Overlay Engine ──► IR Builder ──► Renderer ──► Emitter ──► Go project
  (API/JSON)  (graph)     (JSONPath)        (DDD model)   (templates)   (gofmt)
 ```
@@ -77,7 +77,7 @@ SysML v2 ──► Loader ──► Overlay Engine ──► IR Builder ──�
 The output is **bounded-context-first** and obeys the **Dependency Rule** —
 every cross-region import points inward:
 
-```
+```text
 cmd/<context>d/main.go                       # composition root (scaffold-once)
 internal/<context>/
   domain/        # entities, value objects, events, factories, domain services

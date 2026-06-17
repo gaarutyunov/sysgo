@@ -173,7 +173,7 @@ func isReserved(s string) bool {
 	case "break", "case", "chan", "const", "continue", "default", "defer",
 		"else", "fallthrough", "for", "func", "go", "goto", "if", "import",
 		"interface", "map", "package", "range", "return", "select", "struct",
-		"switch", "type", "var", "any", "type_":
+		"switch", "type", "var", "any":
 		return true
 	}
 	return false

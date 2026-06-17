@@ -88,7 +88,9 @@ func (l *Loader) fetchElements(ctx context.Context, commit string) ([]map[string
 		all = append(all, page...)
 		next = parseNextLink(link)
 		if next == "" && len(page) == l.PageSize {
-			// Fallback paging when the server omits Link headers.
+			// Defensive stop: the server returned a full page but no rel="next"
+			// Link header, so we cannot navigate further. Halt rather than risk
+			// looping or guessing page parameters for a non-conforming server.
 			break
 		}
 	}

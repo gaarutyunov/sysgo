@@ -26,6 +26,31 @@ source:
 	}
 }
 
+func TestParsePartialLayoutOverride(t *testing.T) {
+	// A region present but with empty fields must still be fully defaulted, and
+	// regions omitted entirely must be added.
+	cfg, err := Parse([]byte(`
+module: github.com/acme/orders
+source:
+  file: ./model.json
+layout:
+  domain: {}
+  app: { package: app }
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := cfg.Layout["domain"]; got.Dir != "internal/{context}/domain" || got.Package != "domain" {
+		t.Fatalf("empty domain region not defaulted: %+v", got)
+	}
+	if got := cfg.Layout["app"]; got.Package != "app" || got.Dir != "internal/{context}/app/usecase" {
+		t.Fatalf("partial app region not backfilled: %+v", got)
+	}
+	if _, ok := cfg.Layout["cmd"]; !ok {
+		t.Fatal("omitted cmd region not added")
+	}
+}
+
 func TestParseMissingModule(t *testing.T) {
 	if _, err := Parse([]byte(`source: { file: x }`)); err == nil {
 		t.Fatal("expected schema/semantic error for missing module")

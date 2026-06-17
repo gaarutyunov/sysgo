@@ -10,11 +10,14 @@ info:
   title: Orders Go overlay
   version: 1.0.0
 actions:
-  # Force a concrete Go type for the Money value object's amount.
-  - target: $[?(@.declaredName=='amount')]
+  # Force a concrete external Go type for the Order's `total` field. The
+  # selector targets a uniquely-named feature on purpose: the JSONPath subset
+  # matches flat element fields (not nested/parent paths), so a name like
+  # `amount` would match both Money and ChargeRequest — pick a unique name.
+  - target: $[?(@.declaredName=='total')]
     update:
-      x-go-type: "decimal.Decimal"
-      x-go-type-import: "github.com/shopspring/decimal"
+      x-go-type: "money.Money"
+      x-go-type-import: "github.com/acme/money"
 
   # Reclassify PaymentPort explicitly as a driven (outbound) gateway port.
   - target: byName:PaymentPort

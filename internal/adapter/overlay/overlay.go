@@ -75,10 +75,7 @@ func (e *Engine) Apply(elements []map[string]any) ([]map[string]any, error) {
 		case a.Remove:
 			work = applyRemove(work, sel)
 		case a.Copy != "":
-			work, err = applyCopy(work, sel, a.Copy)
-			if err != nil {
-				return nil, fmt.Errorf("overlay: action %d: %w", i, err)
-			}
+			work = applyCopy(work, sel, a.Copy)
 		case a.Update != nil:
 			applyUpdate(work, sel, a.Update)
 		default:
@@ -118,7 +115,7 @@ func applyRemove(elements []map[string]any, sel matcher) []map[string]any {
 
 // applyCopy duplicates matched elements, applying the copy target's update
 // (Overlay v1.1.0 copy semantics, simplified: deep-copy + new @id suffix).
-func applyCopy(elements []map[string]any, sel matcher, suffix string) ([]map[string]any, error) {
+func applyCopy(elements []map[string]any, sel matcher, suffix string) []map[string]any {
 	var dupes []map[string]any
 	for _, el := range elements {
 		if sel.match(el) {
@@ -130,7 +127,7 @@ func applyCopy(elements []map[string]any, sel matcher, suffix string) ([]map[str
 			dupes = append(dupes, c)
 		}
 	}
-	return append(elements, dupes...), nil
+	return append(elements, dupes...)
 }
 
 // mergeInto recursively merges src into dst.
@@ -182,22 +179,23 @@ func refID(v any) string {
 func deepCopy(m map[string]any) map[string]any {
 	out := make(map[string]any, len(m))
 	for k, v := range m {
-		switch t := v.(type) {
-		case map[string]any:
-			out[k] = deepCopy(t)
-		case []any:
-			cp := make([]any, len(t))
-			for i, item := range t {
-				if sub, ok := item.(map[string]any); ok {
-					cp[i] = deepCopy(sub)
-				} else {
-					cp[i] = item
-				}
-			}
-			out[k] = cp
-		default:
-			out[k] = v
-		}
+		out[k] = deepCopyValue(v)
 	}
 	return out
+}
+
+// deepCopyValue recursively clones maps and slices; scalars are returned as-is.
+func deepCopyValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		return deepCopy(t)
+	case []any:
+		cp := make([]any, len(t))
+		for i, item := range t {
+			cp[i] = deepCopyValue(item)
+		}
+		return cp
+	default:
+		return v
+	}
 }

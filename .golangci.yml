@@ -1,33 +1,51 @@
+version: "2"
 run:
-  timeout: 5m
   tests: true
-
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - govet
     - ineffassign
-    - staticcheck
-    - unused
-    - gofmt
-    - goimports
     - misspell
-    - unconvert
     - revive
-
-linters-settings:
-  goimports:
-    local-prefixes: github.com/gaarutyunov/sysgo
-  revive:
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        disabled: true
-
+      - linters:
+          - errcheck
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/gaarutyunov/sysgo
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

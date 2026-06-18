@@ -1,0 +1,10 @@
+{{ template "header" . }}
+{{- with .Entity }}
+// {{ .Name }} is a domain entity.
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ if .Doc }}// {{ .Doc }}
+	{{ end }}{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+{{- end }}

@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Keep GitHub Actions current. Dependabot updates the pinned commit SHAs and
+  # their trailing version comments.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Keep Go module dependencies current.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps

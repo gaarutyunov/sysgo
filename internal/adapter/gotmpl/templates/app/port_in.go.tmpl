@@ -1,0 +1,27 @@
+{{ template "header" . }}
+{{- if .UseCase }}
+{{- with .UseCase }}
+// {{ .Input.Name }} is the input DTO for the {{ .Name }} use case.
+type {{ .Input.Name }} struct {
+{{- range .Input.Fields }}
+	{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+
+// {{ .Output.Name }} is the output DTO for the {{ .Name }} use case.
+type {{ .Output.Name }} struct {
+{{- range .Output.Fields }}
+	{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+{{- end }}
+{{- end }}
+{{- with .Port }}
+// {{ .Name }} is a driving (inbound) port: the boundary through which the
+// outside world invokes application behavior.
+type {{ .Name }} interface {
+{{- range .Methods }}
+	{{ sig . }}
+{{- end }}
+}
+{{- end }}

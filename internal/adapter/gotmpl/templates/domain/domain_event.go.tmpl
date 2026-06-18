@@ -1,0 +1,14 @@
+{{ template "header" . }}
+{{- with .Event }}
+// {{ .Name }} is a domain event: a fact that happened in the domain.
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+
+// EventName returns the canonical name of this domain event.
+func ({{ receiver .Name }} {{ .Name }}) EventName() string {
+	return "{{ .Name }}"
+}
+{{- end }}

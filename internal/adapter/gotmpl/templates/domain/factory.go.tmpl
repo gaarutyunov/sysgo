@@ -1,0 +1,8 @@
+{{ template "header" . }}
+{{- with .Entity }}
+// New{{ .Name }} is a factory that constructs a valid {{ .Name }} aggregate.
+// Add invariant checks here; return an error when they are violated.
+func New{{ .Name }}() (*{{ .Name }}, error) {
+	return &{{ .Name }}{}, nil
+}
+{{- end }}

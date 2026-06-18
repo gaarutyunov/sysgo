@@ -1,0 +1,18 @@
+{{ template "header" . }}
+{{- with .UseCase }}
+// {{ .Name }}Interactor implements the {{ .Name }} use case. This scaffold is
+// written once; add orchestration logic here. sysgo will not overwrite it.
+type {{ .Name }}Interactor struct{}
+
+var _ {{ $.PortInPkg }}.{{ .Port.Name }} = (*{{ .Name }}Interactor)(nil)
+
+// New{{ .Name }}Interactor constructs the interactor. Inject driven ports here.
+func New{{ .Name }}Interactor() *{{ .Name }}Interactor {
+	return &{{ .Name }}Interactor{}
+}
+{{ range .Port.Methods }}
+func ({{ receiver $.UseCase.Name }} *{{ $.UseCase.Name }}Interactor) {{ sig . }} {
+	{{ zeroReturn . }}
+}
+{{ end }}
+{{- end }}

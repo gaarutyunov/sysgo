@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/gaarutyunov/sysgo/main/schema/sysgo.schema.json
+module: github.com/acme/orders
+
+source:
+  # model.json is produced from OrderContext.sysml by real SysML tooling:
+  #   scripts/sysml2json.sh examples/order/OrderContext.sysml examples/order/model.json
+  file: ./model.json
+
+generate:
+  domain: true
+  usecases: true
+  ports: true
+  adapters: scaffold
+  events: true
+  tests: false
+  importlint: true
+
+ports:
+  driven-dir: app/port/out
+  driving-dir: app/port/in
+  repository-in-domain: false
+
+type-mapping:
+  Currency::Money: { type: "money.Money", import: "github.com/acme/money" }

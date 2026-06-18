@@ -1,0 +1,16 @@
+{{ template "header" . }}
+{{- with .ValueObject }}
+// {{ .Name }} is a value object: immutable and compared by value.
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ if .Doc }}// {{ .Doc }}
+	{{ end }}{{ .Name }} {{ .GoType }} {{ .Tags }}
+{{- end }}
+}
+{{ if comparableFields .Fields }}
+// Equal reports whether two {{ .Name }} values are equal.
+func ({{ receiver .Name }} {{ .Name }}) Equal(other {{ .Name }}) bool {
+	return {{ receiver .Name }} == other
+}
+{{- end }}
+{{- end }}

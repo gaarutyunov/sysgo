@@ -1,0 +1,10 @@
+{{ template "header" . }}
+{{- with .Service }}
+// {{ .Name }} is a domain service: a stateless domain operation that does not
+// naturally belong to a single entity or value object.
+type {{ .Name }} interface {
+{{- range .Methods }}
+	{{ sig . }}
+{{- end }}
+}
+{{- end }}

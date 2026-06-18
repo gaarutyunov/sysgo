@@ -1,0 +1,8 @@
+{{ template "header" . }}
+
+// main is the composition root for the {{ .Name }} bounded context. This is the
+// only place allowed to import every region and wire concrete adapters into
+// ports via constructor injection. This scaffold is written once.
+func main() {
+	log.Println("{{ .Name }}: composition root — wire adapters into ports here")
+}

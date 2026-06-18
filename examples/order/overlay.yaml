@@ -1,0 +1,25 @@
+# Example overlay for the Order context. Apply it by adding to sysgo.yaml:
+#
+#   overlay:
+#     path: ./overlay.yaml
+#
+# Overlays patch the model JSON before IR build, so you can steer generation
+# without editing the source model.
+overlay: 1.0.0
+info:
+  title: Orders Go overlay
+  version: 1.0.0
+actions:
+  # Force a concrete external Go type for the Order's `total` field. The
+  # selector targets a uniquely-named feature on purpose: the JSONPath subset
+  # matches flat element fields (not nested/parent paths), so a name like
+  # `amount` would match both Money and ChargeRequest — pick a unique name.
+  - target: $[?(@.declaredName=='total')]
+    update:
+      x-go-type: "money.Money"
+      x-go-type-import: "github.com/acme/money"
+
+  # Reclassify PaymentPort explicitly as a driven (outbound) gateway port.
+  - target: byName:PaymentPort
+    update:
+      x-ddd-stereotype: "driven-port"

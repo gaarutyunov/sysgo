@@ -1,0 +1,10 @@
+{{ template "header" . }}
+{{- with .Port }}
+// {{ .Name }} is a driven (outbound) port: an interface the application core
+// calls outward through. Its implementation lives in an adapter.
+type {{ .Name }} interface {
+{{- range .Methods }}
+	{{ sig . }}
+{{- end }}
+}
+{{- end }}

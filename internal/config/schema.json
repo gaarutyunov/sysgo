@@ -40,7 +40,37 @@
         "events": { "type": "boolean" },
         "tests": { "type": "boolean" },
         "importlint": { "type": "boolean" },
-        "cmd": { "type": "string", "enum": ["per-context", "off", "mono"] }
+        "di": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "provider": { "type": "string", "enum": ["wire"] }
+          }
+        },
+        "cmd": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["per-context", "mono", "custom", "off"] },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "contexts"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "contexts": {
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1 },
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "ports": {

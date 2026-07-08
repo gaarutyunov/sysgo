@@ -45,7 +45,31 @@ type Generate struct {
 	Events     bool   `yaml:"events"`
 	Tests      bool   `yaml:"tests"`
 	ImportLint bool   `yaml:"importlint"`
-	Cmd        string `yaml:"cmd"` // per-context | off | mono
+	DI         DI     `yaml:"di"`
+	Cmd        Cmd    `yaml:"cmd"`
+}
+
+// DI controls dependency-injection wiring. When enabled, sysgo emits a
+// wire.ProviderSet per context and, for each binary, a wire injector. The two
+// axes are independent: DI decides *how* things are wired; Cmd decides *which*
+// binaries exist.
+type DI struct {
+	Enabled  bool   `yaml:"enabled"`
+	Provider string `yaml:"provider"` // wire (only value supported)
+}
+
+// Cmd controls the composition-root binaries.
+type Cmd struct {
+	Mode string `yaml:"mode"` // per-context | mono | custom | off
+	// Groups defines the binaries in custom mode: each group captures a set of
+	// bounded contexts into one binary.
+	Groups []CmdGroup `yaml:"groups,omitempty"`
+}
+
+// CmdGroup captures one or more bounded contexts into a single binary.
+type CmdGroup struct {
+	Name     string   `yaml:"name"`
+	Contexts []string `yaml:"contexts"`
 }
 
 // Ports controls port directory placement and repository-interface location.
@@ -90,16 +114,22 @@ const (
 	// AdaptersFull emits adapters fully.
 	AdaptersFull = "full"
 
-	// CmdPerContext emits one composition-root main.go per bounded context
+	// CmdPerContext emits one composition-root binary per bounded context
 	// (a microservice per context). This is the default.
 	CmdPerContext = "per-context"
+	// CmdMono emits a single binary that wires every bounded context.
+	CmdMono = "mono"
+	// CmdCustom emits one binary per Cmd.Groups entry, each capturing a chosen
+	// set of contexts.
+	CmdCustom = "custom"
 	// CmdOff emits no cmd/ files, leaving the user to wire the app themselves.
 	CmdOff = "off"
-	// CmdMono emits a single cobra + wire application that wires every bounded
-	// context, each context exposing a configured wire ProviderSet.
-	CmdMono = "mono"
 
-	// WireImportPath is the compile-time DI toolkit the mono scaffold targets.
+	// DIProviderWire selects the goforj/wire compile-time DI toolkit. It is the
+	// only supported provider today.
+	DIProviderWire = "wire"
+
+	// WireImportPath is the compile-time DI toolkit the wire scaffold targets.
 	WireImportPath = "github.com/goforj/wire"
 
 	// DefaultMarker is the canonical Go generated-code marker.

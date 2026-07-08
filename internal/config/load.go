@@ -21,7 +21,8 @@ func Default() *Config {
 			Events:     true,
 			Tests:      false,
 			ImportLint: true,
-			Cmd:        CmdPerContext,
+			DI:         DI{Enabled: false, Provider: DIProviderWire},
+			Cmd:        Cmd{Mode: CmdPerContext},
 		},
 		Ports: Ports{
 			DrivenDir:  "app/port/out",
@@ -32,7 +33,7 @@ func Default() *Config {
 			"app":      {Dir: "internal/{context}/app/usecase", Package: "usecase"},
 			"ports":    {Dir: "internal/{context}/app/port", Package: "port"},
 			"adapters": {Dir: "internal/{context}/adapter", Package: "adapter"},
-			"cmd":      {Dir: "cmd/{context}d", Package: "main"},
+			"cmd":      {Dir: "cmd/{context}", Package: "main"},
 		},
 		OutputOptions: OutputOptions{
 			GeneratedMarker: DefaultMarker,
@@ -71,8 +72,11 @@ func (c *Config) applyDefaults() {
 	if c.Generate.Adapters == "" {
 		c.Generate.Adapters = AdaptersScaffold
 	}
-	if c.Generate.Cmd == "" {
-		c.Generate.Cmd = CmdPerContext
+	if c.Generate.Cmd.Mode == "" {
+		c.Generate.Cmd.Mode = CmdPerContext
+	}
+	if c.Generate.DI.Provider == "" {
+		c.Generate.DI.Provider = DIProviderWire
 	}
 	if c.Ports.DrivenDir == "" {
 		c.Ports.DrivenDir = "app/port/out"
@@ -116,10 +120,31 @@ func (c *Config) semanticCheck() error {
 	default:
 		return fmt.Errorf("config: generate.adapters must be one of off|scaffold|full, got %q", c.Generate.Adapters)
 	}
-	switch c.Generate.Cmd {
-	case CmdPerContext, CmdOff, CmdMono:
+	switch c.Generate.Cmd.Mode {
+	case CmdPerContext, CmdMono, CmdCustom, CmdOff:
 	default:
-		return fmt.Errorf("config: generate.cmd must be one of per-context|off|mono, got %q", c.Generate.Cmd)
+		return fmt.Errorf("config: generate.cmd.mode must be one of per-context|mono|custom|off, got %q", c.Generate.Cmd.Mode)
+	}
+	if c.Generate.Cmd.Mode == CmdCustom {
+		if len(c.Generate.Cmd.Groups) == 0 {
+			return fmt.Errorf("config: generate.cmd.mode=custom requires at least one group")
+		}
+		seen := map[string]bool{}
+		for i, g := range c.Generate.Cmd.Groups {
+			if g.Name == "" {
+				return fmt.Errorf("config: generate.cmd.groups[%d] is missing a name", i)
+			}
+			if seen[g.Name] {
+				return fmt.Errorf("config: generate.cmd.groups has duplicate name %q", g.Name)
+			}
+			seen[g.Name] = true
+			if len(g.Contexts) == 0 {
+				return fmt.Errorf("config: generate.cmd.groups[%q] must list at least one context", g.Name)
+			}
+		}
+	}
+	if c.Generate.DI.Enabled && c.Generate.DI.Provider != DIProviderWire {
+		return fmt.Errorf("config: generate.di.provider %q is not supported (only %q)", c.Generate.DI.Provider, DIProviderWire)
 	}
 	return nil
 }

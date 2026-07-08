@@ -1,6 +1,7 @@
 package gotmpl
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -10,21 +11,20 @@ import (
 	"github.com/gaarutyunov/sysgo/internal/core/ir"
 )
 
-// This file implements the composition-root emission modes selected by
-// generate.cmd (SPEC §10):
+// This file implements the two orthogonal composition-root axes (SPEC §9.2.1):
 //
-//   per-context  one cmd/<context>d/main.go per bounded context (the default,
-//                a microservice per context).
-//   off          no cmd/ output; the user wires the application themselves.
-//   mono         a single cobra + wire application (cmd/<app>/) plus a
-//                configured wire ProviderSet per context.
+//   generate.di   whether to wire with a DI toolkit (wire). When enabled sysgo
+//                 emits a wire.ProviderSet per context and a wire injector per
+//                 binary; when disabled the binary mains wire by hand.
+//   generate.cmd  which binaries exist: one per context (per-context), one for
+//                 everything (mono), one per context group (custom), or none
+//                 (off). Every binary main is a cobra command.
 
 // providerSetData drives templates/cmd/providers.go.tmpl.
 type providerSetData struct {
 	Marker    string
 	Package   string
 	Name      string
-	App       string
 	Imports   []importLine
 	Providers []providerEntry
 }
@@ -37,24 +37,32 @@ type providerEntry struct {
 	Bind    string
 }
 
-// monoData drives templates/cmd/mono_main.go.tmpl and templates/cmd/wire.go.tmpl.
-type monoData struct {
+// binaryData drives templates/cmd/main.go.tmpl and templates/cmd/wire.go.tmpl.
+type binaryData struct {
 	Marker   string
 	Package  string
 	App      string
 	Module   string
+	DI       bool
+	Multi    bool
 	Imports  []importLine
-	Contexts []monoContext
+	Contexts []binaryContext
 }
 
-// monoContext is the mono root's per-context view.
-type monoContext struct {
+// binaryContext is one context wired into a binary.
+type binaryContext struct {
 	Name         string // bounded-context name (OrderContext)
 	Slug         string // package selector for the context's ProviderSet (order)
-	Inject       string // exported injector suffix (Order); empty if no root port
+	Inject       string // exported injector suffix (Order); empty if no wire root
 	RootType     string // driving port used as the injector's return type
 	RootQual     string // qualified return type (orderin.PlaceOrderUseCase)
 	PortInImport string // import path of the context's app/port/in package
+}
+
+// binary is one composition-root binary and the contexts it wires.
+type binary struct {
+	Name     string
+	Contexts []*ir.Context
 }
 
 // importAlias records an import, aliasing it only when the package's own name
@@ -75,8 +83,8 @@ func sortedImports(m map[string]importLine) []importLine {
 	return out
 }
 
-// appName derives the mono application (and cmd directory) name from the module
-// path's last segment.
+// appName derives a fallback application (and cmd directory) name from the
+// module path's last segment.
 func appName(module string) string {
 	seg := strings.ToLower(gocode.GoName(lastSeg(module)))
 	if seg == "" {
@@ -154,8 +162,9 @@ func (r *Renderer) buildProviders(ctx *ir.Context, lay layout) ([]providerEntry,
 	return provs, imps
 }
 
-// providerSetFile renders internal/<context>/providers.go (generated).
-func (r *Renderer) providerSetFile(ctx *ir.Context, lay layout, app string) (port.File, error) {
+// providerSetFile renders internal/<context>/providers.go (generated). It is
+// emitted only when DI is enabled.
+func (r *Renderer) providerSetFile(ctx *ir.Context, lay layout) (port.File, error) {
 	s := slug(ctx.Name)
 	provs, imps := r.buildProviders(ctx, lay)
 	imps["wire"] = importAlias(config.WireImportPath, "wire")
@@ -163,7 +172,6 @@ func (r *Renderer) providerSetFile(ctx *ir.Context, lay layout, app string) (por
 		Marker:    r.cfg.OutputOptions.GeneratedMarker,
 		Package:   s,
 		Name:      ctx.Name,
-		App:       app,
 		Imports:   sortedImports(imps),
 		Providers: provs,
 	}
@@ -178,56 +186,96 @@ func (r *Renderer) providerSetFile(ctx *ir.Context, lay layout, app string) (por
 	}, nil
 }
 
-// monoContexts builds the mono root's per-context view for every context.
-func (r *Renderer) monoContexts(p *ir.Project) []monoContext {
-	out := make([]monoContext, 0, len(p.Contexts))
-	for _, ctx := range p.Contexts {
-		lay := r.resolveLayout(ctx.Name)
-		s := slug(ctx.Name)
-		mc := monoContext{Name: ctx.Name, Slug: s, PortInImport: lay.portInImport}
-		// A context gets a wire injector when it exposes a driving port whose
-		// interface exists to serve as the injector's concrete return type.
-		if r.cfg.Generate.Ports && len(ctx.DrivingPorts) > 0 {
-			dp := ctx.DrivingPorts[0]
-			mc.Inject = gocode.GoName(s)
-			mc.RootType = dp.Name
-			mc.RootQual = s + "in." + dp.Name
+// binaries resolves the composition-root binaries selected by generate.cmd.
+func (r *Renderer) binaries(p *ir.Project) ([]binary, error) {
+	switch r.cfg.Generate.Cmd.Mode {
+	case config.CmdOff:
+		return nil, nil
+	case config.CmdMono:
+		return []binary{{Name: appName(p.Module), Contexts: p.Contexts}}, nil
+	case config.CmdCustom:
+		byName := map[string]*ir.Context{}
+		for _, ctx := range p.Contexts {
+			byName[ctx.Name] = ctx
+			byName[slug(ctx.Name)] = ctx
 		}
-		out = append(out, mc)
+		var bins []binary
+		for _, g := range r.cfg.Generate.Cmd.Groups {
+			b := binary{Name: g.Name}
+			for _, name := range g.Contexts {
+				ctx, ok := byName[name]
+				if !ok {
+					return nil, fmt.Errorf("gotmpl: cmd group %q references unknown context %q", g.Name, name)
+				}
+				b.Contexts = append(b.Contexts, ctx)
+			}
+			bins = append(bins, b)
+		}
+		return bins, nil
+	default: // config.CmdPerContext
+		bins := make([]binary, 0, len(p.Contexts))
+		for _, ctx := range p.Contexts {
+			bins = append(bins, binary{Name: slug(ctx.Name), Contexts: []*ir.Context{ctx}})
+		}
+		return bins, nil
 	}
-	return out
 }
 
-// monoRootFiles renders the single cobra root (cmd/<app>/main.go) and, when at
-// least one context has an injectable root, the wire injector stub
-// (cmd/<app>/wire.go). Both are scaffold-once.
-func (r *Renderer) monoRootFiles(p *ir.Project) ([]port.File, error) {
-	app := appName(p.Module)
-	mctx := r.monoContexts(p)
+// binaryContextView builds a binary's per-context view, resolving the wire
+// injector target when DI is on and the context exposes a driving port.
+func (r *Renderer) binaryContextView(ctx *ir.Context) binaryContext {
+	lay := r.resolveLayout(ctx.Name)
+	s := slug(ctx.Name)
+	bc := binaryContext{Name: ctx.Name, Slug: s, PortInImport: lay.portInImport}
+	if r.cfg.Generate.DI.Enabled && r.cfg.Generate.Ports && len(ctx.DrivingPorts) > 0 {
+		dp := ctx.DrivingPorts[0]
+		bc.Inject = gocode.GoName(s)
+		bc.RootType = dp.Name
+		bc.RootQual = s + "in." + dp.Name
+	}
+	return bc
+}
+
+// binaryFiles renders one binary's cobra main (scaffold-once) and, when DI is
+// enabled and at least one context has an injectable root, its wire injector
+// stub (scaffold-once, //go:build wireinject).
+func (r *Renderer) binaryFiles(p *ir.Project, b binary) ([]port.File, error) {
+	di := r.cfg.Generate.DI.Enabled
 	scaffoldMarker := "// Code scaffolded by sysgo; edit freely (not regenerated)."
 
-	main := &monoData{
+	views := make([]binaryContext, 0, len(b.Contexts))
+	for _, ctx := range b.Contexts {
+		views = append(views, r.binaryContextView(ctx))
+	}
+
+	main := &binaryData{
 		Marker:   scaffoldMarker,
 		Package:  "main",
-		App:      app,
+		App:      b.Name,
 		Module:   p.Module,
+		DI:       di,
+		Multi:    len(b.Contexts) > 1,
 		Imports:  []importLine{{Path: "log"}, {Path: "github.com/spf13/cobra"}},
-		Contexts: mctx,
+		Contexts: views,
 	}
-	mainContent, err := r.exec("mono_main.go.tmpl", main)
+	mainContent, err := r.exec("main.go.tmpl", main)
 	if err != nil {
 		return nil, err
 	}
 	files := []port.File{{
-		Path:         "cmd/" + app + "/main.go",
+		Path:         "cmd/" + b.Name + "/main.go",
 		Content:      mainContent,
 		ScaffoldOnce: true,
 	}}
 
+	if !di {
+		return files, nil
+	}
+
 	// wire.go injectors — only for contexts that have an injectable root.
 	imps := map[string]importLine{"wire": importAlias(config.WireImportPath, "wire")}
 	injectable := false
-	for _, c := range mctx {
+	for _, c := range views {
 		if c.Inject == "" {
 			continue
 		}
@@ -236,23 +284,40 @@ func (r *Renderer) monoRootFiles(p *ir.Project) ([]port.File, error) {
 		imps[c.Slug+"in"] = importLine{Alias: c.Slug + "in", Path: c.PortInImport}
 	}
 	if injectable {
-		wire := &monoData{
+		wire := &binaryData{
 			Marker:   scaffoldMarker,
 			Package:  "main",
-			App:      app,
+			App:      b.Name,
 			Imports:  sortedImports(imps),
-			Contexts: mctx,
+			Contexts: views,
 		}
 		wireContent, err := r.exec("wire.go.tmpl", wire)
 		if err != nil {
 			return nil, err
 		}
 		files = append(files, port.File{
-			Path:         "cmd/" + app + "/wire.go",
+			Path:         "cmd/" + b.Name + "/wire.go",
 			Content:      wireContent,
 			ScaffoldOnce: true,
 		})
 	}
 
+	return files, nil
+}
+
+// cmdFiles renders every composition-root binary for the project.
+func (r *Renderer) cmdFiles(p *ir.Project) ([]port.File, error) {
+	bins, err := r.binaries(p)
+	if err != nil {
+		return nil, err
+	}
+	var files []port.File
+	for _, b := range bins {
+		fs, err := r.binaryFiles(p, b)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, fs...)
+	}
 	return files, nil
 }

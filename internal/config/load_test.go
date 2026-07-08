@@ -91,7 +91,7 @@ generate: { adapters: sometimes }
 	}
 }
 
-func TestParseCmdDefaultAndModes(t *testing.T) {
+func TestParseCmdAndDIDefaults(t *testing.T) {
 	cfg, err := Parse([]byte(`
 module: github.com/acme/orders
 source:
@@ -100,24 +100,65 @@ source:
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if cfg.Generate.Cmd != CmdPerContext {
-		t.Fatalf("default cmd = %q, want %q", cfg.Generate.Cmd, CmdPerContext)
+	if cfg.Generate.Cmd.Mode != CmdPerContext {
+		t.Fatalf("default cmd.mode = %q, want %q", cfg.Generate.Cmd.Mode, CmdPerContext)
 	}
-	for _, mode := range []string{CmdPerContext, CmdOff, CmdMono} {
-		if _, err := Parse([]byte("module: m\nsource: { file: x }\ngenerate: { cmd: " + mode + " }\n")); err != nil {
-			t.Fatalf("cmd %q rejected: %v", mode, err)
+	if cfg.Generate.DI.Enabled {
+		t.Fatal("DI should be disabled by default")
+	}
+	if cfg.Generate.DI.Provider != DIProviderWire {
+		t.Fatalf("default DI provider = %q, want %q", cfg.Generate.DI.Provider, DIProviderWire)
+	}
+	for _, mode := range []string{CmdPerContext, CmdMono, CmdOff} {
+		if _, err := Parse([]byte("module: m\nsource: { file: x }\ngenerate: { cmd: { mode: " + mode + " } }\n")); err != nil {
+			t.Fatalf("cmd mode %q rejected: %v", mode, err)
 		}
 	}
 }
 
-func TestParseInvalidCmd(t *testing.T) {
+func TestParseCustomGroups(t *testing.T) {
+	cfg, err := Parse([]byte(`
+module: m
+source: { file: x }
+generate:
+  cmd:
+    mode: custom
+    groups:
+      - name: commerce
+        contexts: [OrderContext, PaymentContext]
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(cfg.Generate.Cmd.Groups) != 1 || cfg.Generate.Cmd.Groups[0].Name != "commerce" {
+		t.Fatalf("groups not parsed: %+v", cfg.Generate.Cmd.Groups)
+	}
+	// custom mode with no groups is rejected.
+	if _, err := Parse([]byte("module: m\nsource: { file: x }\ngenerate: { cmd: { mode: custom } }\n")); err == nil {
+		t.Fatal("expected error for custom mode with no groups")
+	}
+}
+
+func TestParseInvalidCmdMode(t *testing.T) {
 	_, err := Parse([]byte(`
 module: m
 source: { file: x }
-generate: { cmd: microservices }
+generate: { cmd: { mode: microservices } }
 `))
 	if err == nil {
-		t.Fatal("expected enum violation for cmd")
+		t.Fatal("expected enum violation for cmd.mode")
+	}
+}
+
+func TestParseUnsupportedDIProvider(t *testing.T) {
+	_, err := Parse([]byte(`
+module: m
+source: { file: x }
+generate:
+  di: { enabled: true, provider: dig }
+`))
+	if err == nil {
+		t.Fatal("expected error for unsupported DI provider")
 	}
 }
 

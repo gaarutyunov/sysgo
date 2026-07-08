@@ -106,6 +106,11 @@ func (r *Renderer) Render(p *ir.Project) ([]port.File, error) {
 		}
 		files = append(files, fs...)
 	}
+	cmdFiles, err := r.cmdFiles(p)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, cmdFiles...)
 	if r.cfg.Generate.ImportLint {
 		files = append(files, r.archLintFile())
 	}
@@ -273,12 +278,15 @@ func (r *Renderer) renderContext(p *ir.Project, ctx *ir.Context) ([]port.File, e
 		}
 	}
 
-	// Composition root (scaffold-once).
-	cq := sets.qualifier(lay.cmdPkg)
-	cq.add("log", "")
-	if err := emit("main.go.tmpl", lay.cmdPkg, lay.cmdDir, "main.go", false, true, cq,
-		func(d *tmplData) {}); err != nil {
-		return nil, err
+	// When DI is enabled, emit the context's wire ProviderSet (generated). The
+	// composition-root binaries that consume it are emitted once in Render,
+	// driven by generate.cmd.
+	if r.cfg.Generate.DI.Enabled {
+		pf, err := r.providerSetFile(ctx, lay)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, pf)
 	}
 
 	return files, nil
@@ -313,7 +321,13 @@ components:
   app:    { in: internal/**/app/** }
   adapter: { in: internal/**/adapter/** }
   cmd:    { in: cmd/** }
-deps:
+`
+	if r.cfg.Generate.DI.Enabled {
+		// The wire ProviderSet lives at the context root and, like cmd, composes
+		// every inner region.
+		content += "  wiring: { in: internal/*/*.go }\n"
+	}
+	content += `deps:
   domain:
     mayDependOn: []
   app:
@@ -323,5 +337,10 @@ deps:
   cmd:
     mayDependOn: [domain, app, adapter]
 `
+	if r.cfg.Generate.DI.Enabled {
+		content += `  wiring:
+    mayDependOn: [domain, app, adapter]
+`
+	}
 	return port.File{Path: ".go-arch-lint.yml", Content: []byte(content)}
 }

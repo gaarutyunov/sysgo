@@ -1,0 +1,16 @@
+{{ template "header" . }}
+// ProviderSet wires the {{ .Name }} bounded context. It groups the context's
+// driven adapters, interactors, and driving adapters, binding each concrete
+// type to the port interface it satisfies. Feed it to a wire injector (each
+// binary's cmd/<name>/wire.go) to build the context.
+var ProviderSet = wire.NewSet(
+{{- range .Providers }}
+{{- if .Comment }}
+	// {{ .Comment }}
+{{- end }}
+	{{ .Ctor }},
+{{- if .Bind }}
+	{{ .Bind }},
+{{- end }}
+{{- end }}
+)

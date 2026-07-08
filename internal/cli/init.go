@@ -28,6 +28,22 @@ generate:
   events: true
   tests: false
   importlint: true
+  # di wires the scaffold with a compile-time DI toolkit. When enabled, sysgo
+  # emits a wire.ProviderSet per context and a wire injector per binary.
+  di:
+    enabled: false
+    provider: wire     # only wire is supported today
+  # cmd selects which composition-root binaries are emitted:
+  #   per-context  one cobra binary per context (a microservice per context)
+  #   mono         a single cobra binary wiring every context
+  #   custom       one binary per group (see groups below)
+  #   off          none — you wire the application yourself
+  cmd:
+    mode: per-context
+    # groups (custom mode only): capture contexts into separate binaries.
+    # groups:
+    #   - name: commerce
+    #     contexts: [OrderContext, PaymentContext]
 
 ports:
   driven-dir: app/port/out

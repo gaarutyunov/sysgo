@@ -234,7 +234,7 @@ This is the heart of the spec. The emitted project obeys the **Dependency Rule**
 .
 ├── go.mod
 ├── cmd/
-│   └── orderd/
+│   └── order/
 │       └── main.go                      # composition root  (scaffold-once)
 └── internal/
     └── order/                           # bounded context  (Screaming Architecture)
@@ -265,7 +265,42 @@ This is the heart of the spec. The emitted project obeys the **Dependency Rule**
                     └── payment_gateway.go     # driven adapter       (scaffold)
 ```
 
-Dependency directions (all inward): `adapter/out/postgres` imports `app/port/out` + `domain`; `app/usecase` imports `app/port/*` + `domain`; `domain` imports nothing in the context. `cmd/orderd` (composition root) is the only place allowed to import everything and wire concrete adapters into ports via constructor injection.
+Dependency directions (all inward): `adapter/out/postgres` imports `app/port/out` + `domain`; `app/usecase` imports `app/port/*` + `domain`; `domain` imports nothing in the context. `cmd/order` (composition root) is the only place allowed to import everything and wire concrete adapters into ports via constructor injection.
+
+#### 9.2.1 Composition root — DI and cmd (two independent axes)
+
+The composition root is not one-size-fits-all. Two orthogonal settings control
+it — `generate.di` (*how* dependencies are wired) and `generate.cmd` (*which*
+binaries exist). Every binary `main.go` is scaffold-once.
+
+**`generate.di`** — optional [cobra](https://github.com/spf13/cobra) +
+[wire](https://github.com/goforj/wire) wiring, independent of the cmd shape:
+
+- **`enabled: false`** (default) — a minimal, dependency-free `main.go`
+  (standard library only) that the user wires by hand. This keeps the default
+  generated project buildable against the standard library alone.
+- **`enabled: true`** — the binary main becomes a cobra entrypoint and, for
+  every context, sysgo emits a **generated**
+  `internal/<context>/providers.go` exposing a `wire.ProviderSet` that lists each
+  constructor and `wire.Bind`s the concrete adapter/interactor to the port it
+  satisfies. Each emitted binary additionally gets a **scaffold-once**
+  `cmd/<name>/wire.go` injector (tagged `//go:build wireinject`); `wire ./...`
+  in the generated project turns the stubs into concrete `wire_gen.go`. The
+  arch-lint ruleset gains a `wiring` component so the context-root provider sets
+  may compose every inner region, exactly like `cmd`. `provider` selects the
+  toolkit; only `wire` is supported today. Because DI is independent of `cmd`,
+  it may be enabled even with `cmd.mode: off` so a hand-written root can consume
+  the provider sets.
+
+**`generate.cmd.mode`** — which composition-root binaries are emitted:
+
+- **`per-context`** (default) — one `cmd/<context>/main.go` per bounded context:
+  a microservice per context, as shown in the tree above.
+- **`mono`** — a single `cmd/<module>/main.go` wiring every context.
+- **`custom`** — one binary per `cmd.groups` entry, each capturing a chosen set
+  of contexts (`{ name, contexts: [...] }` → `cmd/<name>/main.go`).
+- **`off`** — no `cmd/` files; the user composes the application by hand. Every
+  other region is still generated.
 
 ### 9.3 Enforcing the Dependency Rule in the output
 
@@ -300,6 +335,12 @@ generate:                      # which artifacts to emit
   events:    true
   tests:     false
   importlint: true             # emit arch-lint ruleset
+  di:                          # dependency-injection wiring (independent of cmd)
+    enabled: false             # emit wire ProviderSets + injectors
+    provider: wire             # wire (only supported)
+  cmd:                         # composition-root binaries
+    mode: per-context          # per-context | mono | custom | off
+    groups: []                 # custom mode: [{ name, contexts: [...] }, ...]
 
 ports:
   driven-dir:  app/port/out
@@ -311,7 +352,7 @@ layout:                        # region → directory + package; {context} inter
   app:      { dir: "internal/{context}/app/usecase",     package: usecase }
   ports:    { dir: "internal/{context}/app/port",        package: port }
   adapters: { dir: "internal/{context}/adapter",         package: adapter }
-  cmd:      { dir: "cmd/{context}d",                      package: main }
+  cmd:      { dir: "cmd/{context}",                       package: main }
 
 type-mapping:
   ISQ::MassValue: { type: float64 }
@@ -519,7 +560,7 @@ Adopt the goa/ent/protoc convention — **split generated from hand-written** ra
 ### M4 — Configuration & Layout
 
 - **TASK-17** `layout` resolver with `{context}` interpolation → per-region dir/package.
-- **TASK-18** `generate` flags (`domain`/`usecases`/`ports`/`adapters`/`events`/`tests`/`importlint`).
+- **TASK-18** `generate` flags (`domain`/`usecases`/`ports`/`adapters`/`events`/`tests`/`importlint`/`di`/`cmd`).
 - **TASK-19** `type-mapping`, `import-mapping`, `additional-imports`, `ports.repository-in-domain`.
 - **TASK-20** Emit optional arch-lint ruleset.
 

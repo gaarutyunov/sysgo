@@ -50,7 +50,7 @@ func TestGenerateOrderGolden(t *testing.T) {
 
 	want := []string{
 		".go-arch-lint.yml",
-		"cmd/orderd/main.go",
+		"cmd/order/main.go",
 		"internal/order/adapter/in/http/place_order_use_case.go",
 		"internal/order/adapter/out/gateway/payment_port.go",
 		"internal/order/adapter/out/repository/order_repository.go",
@@ -89,7 +89,7 @@ func TestScaffoldOnce(t *testing.T) {
 	if _, err := pl.Generate(context.Background(), out); err != nil {
 		t.Fatal(err)
 	}
-	main := filepath.Join(out, "cmd/orderd/main.go")
+	main := filepath.Join(out, "cmd/order/main.go")
 	if err := os.WriteFile(main, []byte("package main\n\nfunc main() { /* mine */ }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestScaffoldOnce(t *testing.T) {
 	}
 	found := false
 	for _, s := range res.Skipped {
-		if s == "cmd/orderd/main.go" {
+		if s == "cmd/order/main.go" {
 			found = true
 		}
 	}
@@ -123,7 +123,7 @@ func TestGeneratedCompiles(t *testing.T) {
 	if _, err := pl.Generate(context.Background(), out); err != nil {
 		t.Fatal(err)
 	}
-	gomod := "module github.com/acme/orders\n\ngo 1.25.11\n"
+	gomod := "module github.com/acme/orders\n\ngo 1.25.12\n"
 	if err := os.WriteFile(filepath.Join(out, "go.mod"), []byte(gomod), 0o644); err != nil {
 		t.Fatal(err)
 	}

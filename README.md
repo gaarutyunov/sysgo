@@ -93,17 +93,17 @@ internal/<context>/
 
 ### Composition root — DI and cmd (two independent axes)
 
-Every composition-root `main.go` is a [cobra](https://github.com/spf13/cobra)
-command (scaffold-once). Two orthogonal settings control the rest: **`di`**
-decides *how* dependencies are wired, and **`cmd`** decides *which* binaries
-exist.
+Two orthogonal settings control the composition root: **`di`** decides *how*
+dependencies are wired, and **`cmd`** decides *which* binaries exist. Every
+`main.go` is scaffold-once.
 
-**`generate.di`** — optional [wire](https://github.com/goforj/wire) wiring:
+**`generate.di`** — optional [cobra](https://github.com/spf13/cobra) +
+[wire](https://github.com/goforj/wire) wiring:
 
 | `di.enabled` | Output |
 |---|---|
-| `false` (default) | You wire the ports by hand in each `main.go`. |
-| `true` | A configured `wire.ProviderSet` per context (`internal/<context>/providers.go`, **generated**) plus a wire injector per binary (`cmd/<name>/wire.go`, `//go:build wireinject`, scaffold-once). `di.provider` selects the toolkit — only `wire` is supported today. |
+| `false` (default) | A minimal, dependency-free `main.go` (standard library only) that you wire by hand. |
+| `true` | A cobra entrypoint plus a configured `wire.ProviderSet` per context (`internal/<context>/providers.go`, **generated**) and a wire injector per binary (`cmd/<name>/wire.go`, `//go:build wireinject`, scaffold-once). `di.provider` selects the toolkit — only `wire` is supported today. |
 
 The `providers.go` set lists every constructor and `wire.Bind`s each concrete
 adapter/interactor to the port it satisfies. Run `wire ./...` in the generated

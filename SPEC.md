@@ -271,15 +271,16 @@ Dependency directions (all inward): `adapter/out/postgres` imports `app/port/out
 
 The composition root is not one-size-fits-all. Two orthogonal settings control
 it — `generate.di` (*how* dependencies are wired) and `generate.cmd` (*which*
-binaries exist). Every binary `main.go` is a
-[cobra](https://github.com/spf13/cobra) command (scaffold-once).
+binaries exist). Every binary `main.go` is scaffold-once.
 
-**`generate.di`** — optional [wire](https://github.com/goforj/wire) wiring,
-independent of the cmd shape:
+**`generate.di`** — optional [cobra](https://github.com/spf13/cobra) +
+[wire](https://github.com/goforj/wire) wiring, independent of the cmd shape:
 
-- **`enabled: false`** (default) — the user wires the ports by hand in each
-  `main.go`.
-- **`enabled: true`** — for every context sysgo emits a **generated**
+- **`enabled: false`** (default) — a minimal, dependency-free `main.go`
+  (standard library only) that the user wires by hand. This keeps the default
+  generated project buildable against the standard library alone.
+- **`enabled: true`** — the binary main becomes a cobra entrypoint and, for
+  every context, sysgo emits a **generated**
   `internal/<context>/providers.go` exposing a `wire.ProviderSet` that lists each
   constructor and `wire.Bind`s the concrete adapter/interactor to the port it
   satisfies. Each emitted binary additionally gets a **scaffold-once**

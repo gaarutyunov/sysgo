@@ -1,7 +1,8 @@
 {{ template "header" . }}
 // main is the composition root for the {{ .App }} binary — the only place
-// allowed to import {{ if .Multi }}every wired bounded context{{ else }}the bounded context{{ end }} and wire concrete adapters
-// into ports. This scaffold is written once.
+// allowed to import {{ if .Multi }}every wired bounded context{{ else }}the bounded context{{ end }} and wire concrete
+// adapters into ports. This scaffold is written once.
+{{- if .DI }}
 func main() {
 	root := &cobra.Command{
 		Use:   "{{ .App }}",
@@ -13,20 +14,16 @@ func main() {
 	}
 }
 
-// newServeCmd starts the {{ .App }} binary.
-{{- if .DI }}
-// Run `wire ./...` to generate wire_gen.go from wire.go, then call the
-// injectors here to obtain the fully-wired dependencies and start your servers.
-{{- else }}
-// Construct the adapters and interactors and wire them into the ports here.
-{{- end }}
+// newServeCmd starts the {{ .App }} binary. Run `wire ./...` to generate
+// wire_gen.go from wire.go, then call the injectors here to obtain the
+// fully-wired dependencies and start your servers.
 func newServeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "serve",
 		Short: "Start {{ .App }}",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 {{- range .Contexts }}
-{{- if and $.DI .Inject }}
+{{- if .Inject }}
 			// TODO: {{ .Name }} — build with inject{{ .Inject }}() once wire_gen.go exists.
 {{- else }}
 			// TODO: construct and wire the {{ .Name }} adapters and interactors.
@@ -36,3 +33,14 @@ func newServeCmd() *cobra.Command {
 		},
 	}
 }
+{{- else }}
+func main() {
+	// TODO: construct the adapters and interactors for each context below and
+	// wire them into the ports, then start your servers. Enable generate.di to
+	// scaffold a cobra + wire entrypoint instead.
+{{- range .Contexts }}
+	//   - {{ .Name }}
+{{- end }}
+	log.Printf("{{ .App }}: composition root — wire adapters into ports here")
+}
+{{- end }}

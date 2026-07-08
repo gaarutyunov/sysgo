@@ -131,8 +131,9 @@ func TestCmdPerContextNoDI(t *testing.T) {
 	if !main.ScaffoldOnce {
 		t.Fatal("binary main should be scaffold-once")
 	}
-	if !strings.Contains(string(main.Content), "cobra.Command") {
-		t.Fatalf("main.go should build a cobra command:\n%s", main.Content)
+	// Without DI the default output must stay dependency-free (stdlib only).
+	if strings.Contains(string(main.Content), "spf13/cobra") {
+		t.Fatalf("no-DI main.go must not import cobra:\n%s", main.Content)
 	}
 	if _, ok := files["internal/order/providers.go"]; ok {
 		t.Fatal("DI disabled: no wire provider set expected")

@@ -248,6 +248,13 @@ func (r *Renderer) binaryFiles(p *ir.Project, b binary) ([]port.File, error) {
 		views = append(views, r.binaryContextView(ctx))
 	}
 
+	// The no-DI scaffold is a minimal stdlib main; DI upgrades it to a
+	// cobra + wire entrypoint. Keeping the default dependency-free means the
+	// generated project compiles against the standard library alone.
+	imports := []importLine{{Path: "log"}}
+	if di {
+		imports = append(imports, importLine{Path: "github.com/spf13/cobra"})
+	}
 	main := &binaryData{
 		Marker:   scaffoldMarker,
 		Package:  "main",
@@ -255,7 +262,7 @@ func (r *Renderer) binaryFiles(p *ir.Project, b binary) ([]port.File, error) {
 		Module:   p.Module,
 		DI:       di,
 		Multi:    len(b.Contexts) > 1,
-		Imports:  []importLine{{Path: "log"}, {Path: "github.com/spf13/cobra"}},
+		Imports:  imports,
 		Contexts: views,
 	}
 	mainContent, err := r.exec("main.go.tmpl", main)

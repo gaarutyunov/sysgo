@@ -1,6 +1,6 @@
 module github.com/gaarutyunov/sysgo
 
-go 1.25.11
+go 1.25.12
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1

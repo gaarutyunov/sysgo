@@ -21,6 +21,7 @@ func Default() *Config {
 			Events:     true,
 			Tests:      false,
 			ImportLint: true,
+			Cmd:        CmdPerContext,
 		},
 		Ports: Ports{
 			DrivenDir:  "app/port/out",
@@ -70,6 +71,9 @@ func (c *Config) applyDefaults() {
 	if c.Generate.Adapters == "" {
 		c.Generate.Adapters = AdaptersScaffold
 	}
+	if c.Generate.Cmd == "" {
+		c.Generate.Cmd = CmdPerContext
+	}
 	if c.Ports.DrivenDir == "" {
 		c.Ports.DrivenDir = "app/port/out"
 	}
@@ -111,6 +115,11 @@ func (c *Config) semanticCheck() error {
 	case AdaptersOff, AdaptersScaffold, AdaptersFull:
 	default:
 		return fmt.Errorf("config: generate.adapters must be one of off|scaffold|full, got %q", c.Generate.Adapters)
+	}
+	switch c.Generate.Cmd {
+	case CmdPerContext, CmdOff, CmdMono:
+	default:
+		return fmt.Errorf("config: generate.cmd must be one of per-context|off|mono, got %q", c.Generate.Cmd)
 	}
 	return nil
 }

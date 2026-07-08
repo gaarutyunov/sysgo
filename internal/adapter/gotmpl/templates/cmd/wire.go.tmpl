@@ -1,0 +1,22 @@
+//go:build wireinject
+// +build wireinject
+
+{{ .Marker }}
+
+package {{ .Package }}
+
+import (
+{{- range .Imports }}
+	{{ if .Alias }}{{ .Alias }} {{ end }}"{{ .Path }}"
+{{- end }}
+)
+{{ range .Contexts }}{{ if .Inject }}
+// inject{{ .Inject }} builds the {{ .Name }} bounded context and returns its
+// {{ .RootType }} driving port, fully wired from {{ .Slug }}.ProviderSet. Adjust
+// the return type to whatever root your application needs, then run
+// `wire ./...` to generate the concrete wire_gen.go.
+func inject{{ .Inject }}() ({{ .RootQual }}, error) {
+	wire.Build({{ .Slug }}.ProviderSet)
+	return nil, nil
+}
+{{ end }}{{ end }}

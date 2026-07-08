@@ -1,0 +1,31 @@
+{{ template "header" . }}
+// main is the composition root for the {{ .App }} application. It is the only
+// place allowed to import every bounded context and wire concrete adapters into
+// ports — here via each context's wire ProviderSet. This scaffold is written
+// once.
+func main() {
+	root := &cobra.Command{
+		Use:   "{{ .App }}",
+		Short: "{{ .App }} — composition root wiring all bounded contexts",
+	}
+	root.AddCommand(newServeCmd())
+	if err := root.Execute(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// newServeCmd starts the application. Run `wire ./...` to generate wire_gen.go
+// from the injectors in wire.go, then call them here to obtain the fully-wired
+// dependencies and start your servers.
+func newServeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "serve",
+		Short: "Start the {{ .App }} application",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+{{- range .Contexts }}
+			// TODO: wire the {{ .Name }} context{{ if .Inject }} — build it with inject{{ .Inject }}() once wire_gen.go exists{{ end }}.
+{{- end }}
+			return nil
+		},
+	}
+}

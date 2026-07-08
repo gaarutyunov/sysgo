@@ -267,6 +267,27 @@ This is the heart of the spec. The emitted project obeys the **Dependency Rule**
 
 Dependency directions (all inward): `adapter/out/postgres` imports `app/port/out` + `domain`; `app/usecase` imports `app/port/*` + `domain`; `domain` imports nothing in the context. `cmd/orderd` (composition root) is the only place allowed to import everything and wire concrete adapters into ports via constructor injection.
 
+#### 9.2.1 Composition-root shape (`generate.cmd`)
+
+The composition root is not one-size-fits-all, so `generate.cmd` selects how the
+`cmd/` output is emitted:
+
+- **`per-context`** (default) — one `cmd/<context>d/main.go` per bounded context:
+  a microservice per context, as shown in the tree above.
+- **`off`** — no `cmd/` files at all; the user composes the application by hand.
+  Every other region is still generated.
+- **`mono`** — a single [cobra](https://github.com/spf13/cobra) +
+  [wire](https://github.com/goforj/wire) binary under `cmd/<module>/` that wires
+  every context. For each context sysgo emits a **generated**
+  `internal/<context>/providers.go` exposing a `wire.ProviderSet` that lists each
+  constructor and `wire.Bind`s the concrete adapter/interactor to the port
+  interface it satisfies. The cobra root (`cmd/<module>/main.go`) and the wire
+  injectors (`cmd/<module>/wire.go`, tagged `//go:build wireinject`) are
+  **scaffold-once**; `wire ./...` in the generated project turns the injector
+  stubs into concrete `wire_gen.go`. The arch-lint ruleset gains a `wiring`
+  component so the context-root provider sets may compose every inner region,
+  exactly like `cmd`.
+
 ### 9.3 Enforcing the Dependency Rule in the output
 
 - Place region code under `internal/<context>/...` so Go’s `internal/` visibility plus import discipline keeps boundaries.
@@ -300,6 +321,7 @@ generate:                      # which artifacts to emit
   events:    true
   tests:     false
   importlint: true             # emit arch-lint ruleset
+  cmd:       per-context       # per-context | off | mono (composition root shape)
 
 ports:
   driven-dir:  app/port/out

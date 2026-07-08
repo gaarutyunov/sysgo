@@ -106,6 +106,13 @@ func (r *Renderer) Render(p *ir.Project) ([]port.File, error) {
 		}
 		files = append(files, fs...)
 	}
+	if r.cfg.Generate.Cmd == config.CmdMono {
+		mono, err := r.monoRootFiles(p)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, mono...)
+	}
 	if r.cfg.Generate.ImportLint {
 		files = append(files, r.archLintFile())
 	}
@@ -273,12 +280,25 @@ func (r *Renderer) renderContext(p *ir.Project, ctx *ir.Context) ([]port.File, e
 		}
 	}
 
-	// Composition root (scaffold-once).
-	cq := sets.qualifier(lay.cmdPkg)
-	cq.add("log", "")
-	if err := emit("main.go.tmpl", lay.cmdPkg, lay.cmdDir, "main.go", false, true, cq,
-		func(d *tmplData) {}); err != nil {
-		return nil, err
+	// Composition root. The generate.cmd mode selects the shape: a per-context
+	// microservice main (default), a per-context wire ProviderSet feeding the
+	// mono root (emitted once in Render), or nothing at all.
+	switch r.cfg.Generate.Cmd {
+	case config.CmdOff:
+		// User wires the application themselves.
+	case config.CmdMono:
+		pf, err := r.providerSetFile(ctx, lay, appName(p.Module))
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, pf)
+	default: // config.CmdPerContext
+		cq := sets.qualifier(lay.cmdPkg)
+		cq.add("log", "")
+		if err := emit("main.go.tmpl", lay.cmdPkg, lay.cmdDir, "main.go", false, true, cq,
+			func(d *tmplData) {}); err != nil {
+			return nil, err
+		}
 	}
 
 	return files, nil
@@ -313,7 +333,13 @@ components:
   app:    { in: internal/**/app/** }
   adapter: { in: internal/**/adapter/** }
   cmd:    { in: cmd/** }
-deps:
+`
+	if r.cfg.Generate.Cmd == config.CmdMono {
+		// The mono wire ProviderSet lives at the context root and, like cmd,
+		// composes every inner region.
+		content += "  wiring: { in: internal/*/*.go }\n"
+	}
+	content += `deps:
   domain:
     mayDependOn: []
   app:
@@ -323,5 +349,10 @@ deps:
   cmd:
     mayDependOn: [domain, app, adapter]
 `
+	if r.cfg.Generate.Cmd == config.CmdMono {
+		content += `  wiring:
+    mayDependOn: [domain, app, adapter]
+`
+	}
 	return port.File{Path: ".go-arch-lint.yml", Content: []byte(content)}
 }

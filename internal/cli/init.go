@@ -28,6 +28,10 @@ generate:
   events: true
   tests: false
   importlint: true
+  # cmd selects the composition root: a microservice main per context
+  # (per-context), a single cobra + wire app wiring every context (mono), or
+  # nothing so you wire the app yourself (off).
+  cmd: per-context
 
 ports:
   driven-dir: app/port/out

@@ -39,7 +39,8 @@
         "adapters": { "type": "string", "enum": ["off", "scaffold", "full"] },
         "events": { "type": "boolean" },
         "tests": { "type": "boolean" },
-        "importlint": { "type": "boolean" }
+        "importlint": { "type": "boolean" },
+        "cmd": { "type": "string", "enum": ["per-context", "off", "mono"] }
       }
     },
     "ports": {

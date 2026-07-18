@@ -1,9 +1,9 @@
-# SYSGO-ENGINE-SPEC
+# ENGINE — sysgo Engine Spec
 
 **Version:** e0.2
 **Status:** Architecture and construction fully locked (concurrency, memory
 strategy, and parser now decided). Scope of deferred layers noted.
-**Parent:** `SYSGO-FRAMEWORK-SPEC.md` (see §2–§5 for platform principles).
+**Parent:** `OVERVIEW.md` (see §2–§5 for platform principles).
 
 ---
 

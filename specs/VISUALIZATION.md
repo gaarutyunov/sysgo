@@ -1,9 +1,9 @@
-# SYSGO-VIZ-SPEC
+# VISUALIZATION — sysgo Visualization Spec
 
 **Version:** v0.1
 **Status:** Architecture locked. Concrete Guix build-out deferred to a separate
 Guix-update spec.
-**Parent:** `SYSGO-FRAMEWORK-SPEC.md`. **Depends on:** `SYSGO-ENGINE-SPEC.md`.
+**Parent:** `OVERVIEW.md`. **Depends on:** `ENGINE.md`.
 
 ---
 

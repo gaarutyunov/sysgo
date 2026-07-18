@@ -1,9 +1,9 @@
-# SYSGO-TEMPORAL-SPEC
+# TEMPORAL — sysgo Temporal Spec
 
 **Version:** s0.2
 **Status:** Decoupled from consumers; all s0.1 open decisions resolved.
-**Parent:** `SYSGO-FRAMEWORK-SPEC.md`. **Depends on:** `SYSGO-ENGINE-SPEC.md`,
-`SYSGO-TEST-SPEC.md` (replay tests).
+**Parent:** `OVERVIEW.md`. **Depends on:** `ENGINE.md`,
+`TEST.md` (replay tests).
 
 ---
 
@@ -131,7 +131,7 @@ no Temporal-specific parser.
   a `vet`-style check in the **generated CI** (framework §7). Guards hand-written
   and hand-edited workflow code. Note: `workflowcheck` is a helper and does not
   catch every case (e.g. global-var mutation).
-- **C (run-time):** the test generator (`SYSGO-TEST-SPEC.md`) emits Temporal
+- **C (run-time):** the test generator (`TEST.md`) emits Temporal
   **replay tests** that detect history drift. Referenced, not duplicated here.
 
 ---

@@ -1,4 +1,4 @@
-# SYSGO-FRAMEWORK-SPEC
+# OVERVIEW — sysgo Framework Spec
 
 **Version:** f0.1
 **Status:** Foundational decisions locked; per-area generator specs pending.
@@ -15,18 +15,19 @@ infrastructure, reliability objectives, and tests.
 The framework is intentionally split across files. This document is deliberately
 thin. It is referenced by, and does not duplicate, the following:
 
-- `SYSGO-ENGINE-SPEC.md` — the pure-Go SysML v2 engine (parser, incremental
+- `ENGINE.md` — the pure-Go SysML v2 engine (parser, incremental
   query engine, semantic resolution, standard library, public API).
-- `SYSGO-VIZ-SPEC.md` — visualization architecture (client-side Go→Wasm, Guix
+- `VISUALIZATION.md` — visualization architecture (client-side Go→Wasm, Guix
   render surface, pure-Go layout). Depends on Guix
   (`github.com/gaarutyunov/guix`); its detailed build-out is a forthcoming
   Guix-update spec.
-- `SYSGO-TEMPORAL-SPEC.md` — Temporal Go generation from SysML behavioral
+- `TEMPORAL.md` — Temporal Go generation from SysML behavioral
   actions plus a Temporal metadata profile (refreshed to s0.2: decoupled from
   consumers, all open decisions resolved).
+- `OPENAPI.md` — the contracts profile (model-first OpenAPI 3.1 emission via
+  oapi-codegen; GraphQL and protobuf profiles deferred).
 - Per-area generator specs (pending, one decision round each):
-  `SYSGO-CONTRACTS-SPEC.md`, `SYSGO-K8S-SPEC.md`, `SYSGO-DEPLOY-SPEC.md`,
-  `SYSGO-SLO-SPEC.md`, `SYSGO-TEST-SPEC.md`.
+  `K8S.md`, `DEPLOY.md`, `SLO.md`, `TEST.md`.
 
 Naming/versioning follows the existing sysgo convention: one file per
 capability, single-letter version prefix (`f` framework, `e` engine, `s`
@@ -55,7 +56,7 @@ and this spec takes precedence.
 
 The framework is a three-layer platform in **one repository, one Go module**:
 
-- `engine/` — the reusable SysML v2 engine (see `SYSGO-ENGINE-SPEC.md`).
+- `engine/` — the reusable SysML v2 engine (see `ENGINE.md`).
 - `gen/` — the generators (the per-area capabilities).
 - `viz/` — LikeC4-capable visualization (later; see §7).
 - `internal/` — used to enforce boundaries between the layers.
@@ -95,7 +96,7 @@ Two conventions apply across all per-area specs:
 2. **Per-protocol separation for contracts.** The OpenAPI, GraphQL, and protobuf
    profiles are distinct and each models its protocol's full concepts natively
    (full fidelity, accepted duplication when one API is exposed over two
-   protocols). Detail lives in `SYSGO-CONTRACTS-SPEC.md`.
+   protocols). Detail lives in `OPENAPI.md`.
 
 The "how much does the model own vs. what does the emitter default" boundary is
 set **per area** (it differs between, e.g., deployment and CI) and is recorded in
@@ -182,6 +183,6 @@ spec:
 - Per-area generator specs (contracts, k8s, deploy, slo, test) — each pending its
   own decision round.
 - Visualization layer (`viz/`) — architecture now locked (see
-  `SYSGO-VIZ-SPEC.md`); the concrete Guix build-out (layout engine, diagram
+  `VISUALIZATION.md`); the concrete Guix build-out (layout engine, diagram
   components, interaction, export) is a forthcoming Guix-update spec.
-- Language server — deferred (see `SYSGO-ENGINE-SPEC.md`).
+- Language server — deferred (see `ENGINE.md`).

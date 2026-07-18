@@ -1,4 +1,4 @@
-# SPEC.md — `sysgo`: A SysML v2 → Go DDD/Hexagonal Code Generator
+# ARCHIVE — `sysgo`: A SysML v2 → Go DDD/Hexagonal Code Generator (archived original `SPEC.md`)
 
 > Status: **Draft v0.2** · Working name: **`sysgo`** (placeholder — rename freely) · Module: `github.com/gaarutyunov/sysgo`
 > 

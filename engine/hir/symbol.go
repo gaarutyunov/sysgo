@@ -45,6 +45,10 @@ type Symbol struct {
 	// symbol inherits members from. Populated by relationship resolution.
 	Supertypes []*Symbol
 
+	// Relations holds this symbol's resolved relationship clauses (with typed
+	// target symbols). Populated by relationship resolution.
+	Relations []Relation
+
 	members map[string]*Symbol // local name → child (first wins on collision)
 	order   []*Symbol          // children in declaration order
 	imports []importSpec       // imports declared directly in this scope
@@ -78,6 +82,14 @@ func (k RelKind) String() string {
 	default:
 		return "relationship"
 	}
+}
+
+// Relation is a resolved relationship clause on a symbol, with its typed target.
+type Relation struct {
+	Kind   RelKind
+	Name   string  // the referenced target name
+	Target *Symbol // resolved target, or nil if unresolved
+	Range  text.TextRange
 }
 
 // relSpec is a relationship clause captured at build time, before resolution.

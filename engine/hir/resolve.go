@@ -1,6 +1,9 @@
 package hir
 
 import (
+	"runtime"
+	"sync"
+
 	"github.com/gaarutyunov/sysgo/engine/ast"
 	"github.com/gaarutyunov/sysgo/engine/parser"
 	"github.com/gaarutyunov/sysgo/engine/text"
@@ -65,10 +68,16 @@ func Analyze(src string) *Result {
 // same-named top-level package across units does not yet merge their members
 // (first declaration wins); package merging is deferred.
 func AnalyzeUnits(units []Unit) *Result {
+	// Parse every unit concurrently. Each parse builds its own green arena and
+	// interner and shares nothing, so no synchronization is needed — this is the
+	// concurrency strategy chosen for ENGINE §5a/§13: fully independent per-file
+	// construction rather than a synchronized shared arena. Symbol building runs
+	// sequentially afterward, so the combined model is deterministic.
+	files := parseUnits(units)
+
 	root := &Symbol{Kind: KindRoot, members: map[string]*Symbol{}}
 	root.root = root
-	for _, u := range units {
-		sf := ast.New(parser.Parse(u.Source))
+	for _, sf := range files {
 		for _, m := range sf.Members() {
 			buildMember(root, m)
 		}
@@ -79,6 +88,30 @@ func AnalyzeUnits(units []Unit) *Result {
 	m.buildSupertypes(root)
 	m.resolveRelationships(root, r)
 	return r
+}
+
+// parseUnits parses each unit into a typed AST, in parallel and order-preserving.
+func parseUnits(units []Unit) []ast.SourceFile {
+	files := make([]ast.SourceFile, len(units))
+	if len(units) == 1 {
+		files[0] = ast.New(parser.Parse(units[0].Source))
+		return files
+	}
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, runtime.GOMAXPROCS(0))
+	for i, u := range units {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, src string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			// Distinct index per goroutine: no shared mutable state, race-free.
+			files[i] = ast.New(parser.Parse(src))
+		}(i, u.Source)
+	}
+	wg.Wait()
+	return files
 }
 
 func buildMember(parent *Symbol, m ast.Member) {

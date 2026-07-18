@@ -68,54 +68,68 @@ const (
 	KindBang        // !
 	KindPercent     // %
 	KindCaret       // ^
-	// Node kinds are appended after KindCaret by the recursive-descent core
-	// slice, continuing this iota so token and node kinds never collide.
+
+	// Node kinds. These continue the iota after the token kinds so token and
+	// node kinds never collide. The grammar slices append their own node kinds
+	// here as they grow.
+	KindSourceFile    // a whole source file: a namespace of members
+	KindPackage       // package declaration
+	KindBody          // { ... } member body
+	KindName          // a single name segment (Ident or QuotedIdent)
+	KindQualifiedName // Name (:: Name)*
+	KindErrorNode     // recovery node wrapping unexpected tokens
 )
 
 var kindNames = [...]string{
-	KindError:        "Error",
-	KindEOF:          "EOF",
-	KindWhitespace:   "Whitespace",
-	KindNewline:      "Newline",
-	KindLineComment:  "LineComment",
-	KindBlockComment: "BlockComment",
-	KindIdent:        "Ident",
-	KindQuotedIdent:  "QuotedIdent",
-	KindInt:          "Int",
-	KindReal:         "Real",
-	KindString:       "String",
-	KindLParen:       "LParen",
-	KindRParen:       "RParen",
-	KindLBrace:       "LBrace",
-	KindRBrace:       "RBrace",
-	KindLBracket:     "LBracket",
-	KindRBracket:     "RBracket",
-	KindSemicolon:    "Semicolon",
-	KindComma:        "Comma",
-	KindDot:          "Dot",
-	KindDotDot:       "DotDot",
-	KindColon:        "Colon",
-	KindColonColon:   "ColonColon",
-	KindColonEq:      "ColonEq",
-	KindSpecializes:  "Specializes",
-	KindRedefines:    "Redefines",
-	KindEq:           "Eq",
-	KindStar:         "Star",
-	KindPlus:         "Plus",
-	KindMinus:        "Minus",
-	KindSlash:        "Slash",
-	KindArrow:        "Arrow",
-	KindTilde:        "Tilde",
-	KindAt:           "At",
-	KindHash:         "Hash",
-	KindQuestion:     "Question",
-	KindLt:           "Lt",
-	KindGt:           "Gt",
-	KindAmp:          "Amp",
-	KindPipe:         "Pipe",
-	KindBang:         "Bang",
-	KindPercent:      "Percent",
-	KindCaret:        "Caret",
+	KindError:         "Error",
+	KindEOF:           "EOF",
+	KindWhitespace:    "Whitespace",
+	KindNewline:       "Newline",
+	KindLineComment:   "LineComment",
+	KindBlockComment:  "BlockComment",
+	KindIdent:         "Ident",
+	KindQuotedIdent:   "QuotedIdent",
+	KindInt:           "Int",
+	KindReal:          "Real",
+	KindString:        "String",
+	KindLParen:        "LParen",
+	KindRParen:        "RParen",
+	KindLBrace:        "LBrace",
+	KindRBrace:        "RBrace",
+	KindLBracket:      "LBracket",
+	KindRBracket:      "RBracket",
+	KindSemicolon:     "Semicolon",
+	KindComma:         "Comma",
+	KindDot:           "Dot",
+	KindDotDot:        "DotDot",
+	KindColon:         "Colon",
+	KindColonColon:    "ColonColon",
+	KindColonEq:       "ColonEq",
+	KindSpecializes:   "Specializes",
+	KindRedefines:     "Redefines",
+	KindEq:            "Eq",
+	KindStar:          "Star",
+	KindPlus:          "Plus",
+	KindMinus:         "Minus",
+	KindSlash:         "Slash",
+	KindArrow:         "Arrow",
+	KindTilde:         "Tilde",
+	KindAt:            "At",
+	KindHash:          "Hash",
+	KindQuestion:      "Question",
+	KindLt:            "Lt",
+	KindGt:            "Gt",
+	KindAmp:           "Amp",
+	KindPipe:          "Pipe",
+	KindBang:          "Bang",
+	KindPercent:       "Percent",
+	KindCaret:         "Caret",
+	KindSourceFile:    "SourceFile",
+	KindPackage:       "Package",
+	KindBody:          "Body",
+	KindName:          "Name",
+	KindQualifiedName: "QualifiedName",
+	KindErrorNode:     "ErrorNode",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

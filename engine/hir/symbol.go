@@ -41,10 +41,68 @@ type Symbol struct {
 	Parent *Symbol
 	Range  text.TextRange
 
+	// Supertypes holds the resolved specialization targets — the types this
+	// symbol inherits members from. Populated by relationship resolution.
+	Supertypes []*Symbol
+
 	members map[string]*Symbol // local name → child (first wins on collision)
 	order   []*Symbol          // children in declaration order
 	imports []importSpec       // imports declared directly in this scope
+	rels    []relSpec          // relationship clauses declared on this symbol
 	root    *Symbol
+}
+
+// RelKind classifies a KerML relationship clause.
+type RelKind uint8
+
+const (
+	RelSpecializes RelKind = iota // :> / specializes
+	RelSubsets                    // subsets
+	RelRedefines                  // :>> / redefines
+	RelTyped                      // : (feature typing)
+	RelConjugates                 // ~ / conjugates
+)
+
+func (k RelKind) String() string {
+	switch k {
+	case RelSpecializes:
+		return "specializes"
+	case RelSubsets:
+		return "subsets"
+	case RelRedefines:
+		return "redefines"
+	case RelTyped:
+		return "typed"
+	case RelConjugates:
+		return "conjugates"
+	default:
+		return "relationship"
+	}
+}
+
+// relSpec is a relationship clause captured at build time, before resolution.
+type relSpec struct {
+	kind   RelKind
+	target []string // qualified target name segments
+	rng    text.TextRange
+}
+
+// relKindOf maps a relationship operator or keyword to its RelKind.
+func relKindOf(op string) (RelKind, bool) {
+	switch op {
+	case ":>", "specializes":
+		return RelSpecializes, true
+	case "subsets":
+		return RelSubsets, true
+	case ":>>", "redefines":
+		return RelRedefines, true
+	case ":":
+		return RelTyped, true
+	case "~", "conjugates":
+		return RelConjugates, true
+	default:
+		return 0, false
+	}
 }
 
 func newSymbol(kind SymbolKind, name string, parent *Symbol, rng text.TextRange) *Symbol {

@@ -9,11 +9,12 @@ import (
 // result still round-trips to src byte-for-byte.
 //
 // The grammar covers the top-level skeleton (source file → members, nested
-// bodies, qualified names) plus the KerML declaration layer: visibility
-// prefixes, imports (with ::* / ::** wildcards), type/classifier/feature
-// declarations, relationship clauses (specialization, subsetting, redefinition,
-// feature typing, conjugation), and feature values. Full semantic resolution is
-// a later engine layer; here relationships are only shaped into CST nodes.
+// bodies, qualified names), the KerML declaration layer (visibility, imports
+// with ::* / ::** wildcards, type/classifier/feature declarations, relationship
+// clauses, feature values), and the SysML layer (part/attribute/item/action/
+// port/... definitions and usages, direction/ref modifiers, multiplicity, and
+// @/# prefix annotations). Full semantic resolution is a later engine layer;
+// here everything is only shaped into CST nodes.
 func Parse(src string) *cst.Tree {
 	p := &parser{tokens: Lex(src), b: cst.NewBuilder(nil)}
 	p.parseSourceFile()
@@ -82,38 +83,61 @@ func (p *parser) parseSourceFile() {
 	p.b.FinishNode()
 }
 
-// parseMember dispatches on the member keyword, looking past an optional
-// visibility prefix to decide the member kind.
+// parseMember dispatches on the member keyword, looking past optional @/#
+// annotations and a visibility prefix to decide the member kind.
 func (p *parser) parseMember() {
-	vis := p.atVisibility()
-	kwIdx := 0
-	if vis {
-		kwIdx = 1
-	}
-	kw := ""
-	if t := p.sigTokenN(kwIdx); t.Kind == KindIdent {
-		kw = t.Text
-	}
-
-	switch {
+	switch kw := p.lookaheadMemberKeyword(); {
 	case kw == "import":
-		p.parseImport(vis)
+		p.parseImport()
 	case kw == "package":
-		p.parsePackage(vis)
-	case kw == "abstract" || isTypeKeyword(kw):
-		p.parseTypeDecl(vis)
+		p.parsePackage()
+	case isDeclKeyword(kw):
+		p.parseDeclaration()
 	default:
-		// Not a recognized member (possibly a stray visibility keyword) — the
-		// error recovery swallows it, visibility and all.
 		p.parseErrorMember()
 	}
 }
 
-func (p *parser) atVisibility() bool {
-	t := p.sigTokenN(0)
-	return t.Kind == KindIdent && (t.Text == "public" || t.Text == "private" || t.Text == "protected")
+// lookaheadMemberKeyword returns the declaration keyword that starts the next
+// member, skipping any leading @/# annotations and a visibility keyword. It
+// returns "" when no identifier keyword is found.
+func (p *parser) lookaheadMemberKeyword() string {
+	idx := 0
+	for {
+		t := p.sigTokenN(idx)
+		if t.Kind != KindAt && t.Kind != KindHash {
+			break
+		}
+		idx++ // '@' or '#'
+		if k := p.sigTokenN(idx).Kind; k == KindIdent || k == KindQuotedIdent {
+			idx++
+			for p.sigTokenN(idx).Kind == KindColonColon {
+				idx++ // '::'
+				if k := p.sigTokenN(idx).Kind; k == KindIdent || k == KindQuotedIdent {
+					idx++
+				}
+			}
+		}
+	}
+	if t := p.sigTokenN(idx); t.Kind == KindIdent && isVisibility(t.Text) {
+		idx++
+	}
+	if t := p.sigTokenN(idx); t.Kind == KindIdent {
+		return t.Text
+	}
+	return ""
 }
 
+func isVisibility(s string) bool {
+	return s == "public" || s == "private" || s == "protected"
+}
+
+func (p *parser) atVisibility() bool {
+	t := p.sigTokenN(0)
+	return t.Kind == KindIdent && isVisibility(t.Text)
+}
+
+// isTypeKeyword reports the KerML type-declaration keywords.
 func isTypeKeyword(s string) bool {
 	switch s {
 	case "namespace", "type", "classifier", "class", "struct", "datatype",
@@ -124,19 +148,65 @@ func isTypeKeyword(s string) bool {
 	}
 }
 
-// bumpVisibility emits the leading visibility keyword wrapped in a Visibility
-// node.
+// isSysmlKind reports the SysML definition/usage noun keywords.
+func isSysmlKind(s string) bool {
+	switch s {
+	case "part", "attribute", "item", "action", "port", "connection", "interface",
+		"metadata", "enum", "constraint", "requirement", "state", "calc",
+		"occurrence", "view", "viewpoint", "flow", "allocation", "binding",
+		"succession", "rendering", "concern":
+		return true
+	default:
+		return false
+	}
+}
+
+// isModifier reports the declaration prefix modifiers (direction, ref, etc.).
+func isModifier(s string) bool {
+	switch s {
+	case "abstract", "ref", "in", "out", "inout", "readonly", "derived", "end",
+		"composite", "portion", "variation", "individual", "snapshot", "timeslice":
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *parser) atModifier() bool {
+	t := p.sigTokenN(0)
+	return t.Kind == KindIdent && isModifier(t.Text)
+}
+
+// isDeclKeyword reports whether kw can begin a KerML/SysML declaration.
+func isDeclKeyword(s string) bool {
+	return isTypeKeyword(s) || isSysmlKind(s) || isModifier(s)
+}
+
+// parsePrefix consumes optional @/# annotations and a visibility keyword into
+// the current open node.
+func (p *parser) parsePrefix() {
+	for p.current() == KindAt || p.current() == KindHash {
+		p.b.StartNode(KindAnnotation.Raw())
+		p.bump() // '@' or '#'
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName()
+		}
+		p.b.FinishNode()
+	}
+	if p.atVisibility() {
+		p.bumpVisibility()
+	}
+}
+
 func (p *parser) bumpVisibility() {
 	p.b.StartNode(KindVisibility.Raw())
 	p.bump()
 	p.b.FinishNode()
 }
 
-func (p *parser) parsePackage(vis bool) {
+func (p *parser) parsePackage() {
 	p.b.StartNode(KindPackage.Raw())
-	if vis {
-		p.bumpVisibility()
-	}
+	p.parsePrefix()
 	p.bump() // 'package'
 	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
 		p.parseQualifiedName()
@@ -145,34 +215,53 @@ func (p *parser) parsePackage(vis bool) {
 	p.b.FinishNode()
 }
 
-func (p *parser) parseTypeDecl(vis bool) {
-	p.b.StartNode(KindTypeDecl.Raw())
-	if vis {
-		p.bumpVisibility()
-	}
-	if p.atKeyword("abstract") {
-		p.bump() // 'abstract' modifier
-	}
-	p.bump() // the type keyword
-	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
-		p.parseQualifiedName()
-	}
-	p.parseRelationships()
-	p.parseFeatureValueOpt()
-	p.parseBodyOrSemi()
-	p.b.FinishNode()
-}
-
-func (p *parser) parseImport(vis bool) {
+func (p *parser) parseImport() {
 	p.b.StartNode(KindImport.Raw())
-	if vis {
-		p.bumpVisibility()
-	}
+	p.parsePrefix()
 	p.bump() // 'import'
 	p.parseImportName()
 	if p.current() == KindSemicolon {
 		p.bump()
 	}
+	p.b.FinishNode()
+}
+
+// parseDeclaration parses a KerML or SysML declaration and picks the node kind
+// once the shape is known: a declaration with 'def' is a Def, one led by a
+// KerML type keyword is a TypeDecl, otherwise it is a Usage. The Checkpoint lets
+// us defer that choice until after parsing.
+func (p *parser) parseDeclaration() {
+	cp := p.b.Checkpoint()
+	p.parsePrefix()
+	for p.atModifier() {
+		p.bump() // direction / ref / abstract / ... modifiers
+	}
+	hadDef := false
+	kermlKw := false
+	if t := p.sigTokenN(0); t.Kind == KindIdent && (isTypeKeyword(t.Text) || isSysmlKind(t.Text)) {
+		kermlKw = isTypeKeyword(t.Text)
+		p.bump() // the kind keyword
+		if p.atKeyword("def") {
+			p.bump()
+			hadDef = true
+		}
+	}
+	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+		p.parseQualifiedName()
+	}
+	p.parseRelationships()
+	p.parseMultiplicityOpt()
+	p.parseFeatureValueOpt()
+	p.parseBodyOrSemi()
+
+	kind := KindUsage
+	switch {
+	case hadDef:
+		kind = KindDef
+	case kermlKw:
+		kind = KindTypeDecl
+	}
+	p.b.StartNodeAt(cp, kind.Raw())
 	p.b.FinishNode()
 }
 
@@ -232,6 +321,28 @@ func (p *parser) atRelationship() bool {
 	}
 	return p.atKeyword("specializes") || p.atKeyword("subsets") ||
 		p.atKeyword("redefines") || p.atKeyword("conjugates")
+}
+
+// parseMultiplicityOpt consumes a [ ... ] multiplicity clause if present.
+func (p *parser) parseMultiplicityOpt() {
+	if p.current() != KindLBracket {
+		return
+	}
+	p.b.StartNode(KindMultiplicity.Raw())
+	p.bump() // '['
+	for {
+		switch p.current() {
+		case KindRBracket:
+			p.bump() // ']'
+			p.b.FinishNode()
+			return
+		case KindEOF:
+			p.b.FinishNode() // unterminated — tolerant
+			return
+		default:
+			p.bump()
+		}
+	}
 }
 
 func (p *parser) parseFeatureValueOpt() {
@@ -326,14 +437,14 @@ func (p *parser) parseErrorMember() {
 // atMemberStart reports whether the next significant token begins a member,
 // used as an error-recovery synchronization point.
 func (p *parser) atMemberStart() bool {
-	if p.atVisibility() {
+	if p.current() == KindAt || p.current() == KindHash || p.atVisibility() {
 		return true
 	}
-	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("abstract") {
+	if p.atKeyword("import") || p.atKeyword("package") {
 		return true
 	}
 	t := p.sigTokenN(0)
-	return t.Kind == KindIdent && isTypeKeyword(t.Text)
+	return t.Kind == KindIdent && isDeclKeyword(t.Text)
 }
 
 // parseErrorToken wraps a single unexpected significant token in an error node.

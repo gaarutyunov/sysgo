@@ -87,6 +87,12 @@ const (
 	KindRelationship // one relationship clause: operator/keyword + target list
 	KindFeatureValue // = expr | := expr
 	KindExpr         // primary expression: name reference or literal
+
+	// SysML declarations (parser slice 4).
+	KindDef          // <kind> def Name ... (definition)
+	KindUsage        // <kind> name ... or directed/bare usage
+	KindAnnotation   // @Name / #Name prefix annotation
+	KindMultiplicity // [ ... ] multiplicity after a type
 )
 
 var kindNames = [...]string{
@@ -146,6 +152,10 @@ var kindNames = [...]string{
 	KindRelationship:  "Relationship",
 	KindFeatureValue:  "FeatureValue",
 	KindExpr:          "Expr",
+	KindDef:           "Def",
+	KindUsage:         "Usage",
+	KindAnnotation:    "Annotation",
+	KindMultiplicity:  "Multiplicity",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

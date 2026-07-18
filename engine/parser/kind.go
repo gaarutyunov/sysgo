@@ -78,6 +78,15 @@ const (
 	KindName          // a single name segment (Ident or QuotedIdent)
 	KindQualifiedName // Name (:: Name)*
 	KindErrorNode     // recovery node wrapping unexpected tokens
+
+	// KerML declarations (parser slice 3).
+	KindVisibility   // public | private | protected prefix
+	KindImport       // import declaration
+	KindImportName   // qualified name with an optional ::* / ::** wildcard tail
+	KindTypeDecl     // type/classifier/class/struct/datatype/feature/... decl
+	KindRelationship // one relationship clause: operator/keyword + target list
+	KindFeatureValue // = expr | := expr
+	KindExpr         // primary expression: name reference or literal
 )
 
 var kindNames = [...]string{
@@ -130,6 +139,13 @@ var kindNames = [...]string{
 	KindName:          "Name",
 	KindQualifiedName: "QualifiedName",
 	KindErrorNode:     "ErrorNode",
+	KindVisibility:    "Visibility",
+	KindImport:        "Import",
+	KindImportName:    "ImportName",
+	KindTypeDecl:      "TypeDecl",
+	KindRelationship:  "Relationship",
+	KindFeatureValue:  "FeatureValue",
+	KindExpr:          "Expr",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

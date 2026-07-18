@@ -45,14 +45,33 @@ type Result struct {
 	Relationships []RelRef
 }
 
+// Unit is one named source file participating in a combined analysis.
+type Unit struct {
+	Key    string
+	Source string
+}
+
 // Analyze parses src, builds its symbol model, resolves imports, and returns the
 // model together with the resolved references and diagnostics.
 func Analyze(src string) *Result {
-	sf := ast.New(parser.Parse(src))
+	return AnalyzeUnits([]Unit{{Source: src}})
+}
+
+// AnalyzeUnits builds one combined model from several source units — e.g. a user
+// file together with the standard library — so names resolve across all of them,
+// then resolves imports and relationships against the shared root namespace.
+//
+// Top-level symbols from every unit share the root namespace. Re-declaring a
+// same-named top-level package across units does not yet merge their members
+// (first declaration wins); package merging is deferred.
+func AnalyzeUnits(units []Unit) *Result {
 	root := &Symbol{Kind: KindRoot, members: map[string]*Symbol{}}
 	root.root = root
-	for _, m := range sf.Members() {
-		buildMember(root, m)
+	for _, u := range units {
+		sf := ast.New(parser.Parse(u.Source))
+		for _, m := range sf.Members() {
+			buildMember(root, m)
+		}
 	}
 	r := &Result{Model: &Model{Root: root}}
 	resolveImports(root, root, r)

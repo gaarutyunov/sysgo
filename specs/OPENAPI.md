@@ -1,9 +1,9 @@
-# SYSGO-CONTRACTS-SPEC
+# OPENAPI — sysgo Contracts Spec (OpenAPI profile)
 
 **Version:** c0.1
 **Status:** OpenAPI profile decided end-to-end. GraphQL and protobuf profiles
 deferred until a consumer needs them.
-**Parent:** `SYSGO-FRAMEWORK-SPEC.md`. **Depends on:** `SYSGO-ENGINE-SPEC.md`.
+**Parent:** `OVERVIEW.md`. **Depends on:** `ENGINE.md`.
 
 ---
 

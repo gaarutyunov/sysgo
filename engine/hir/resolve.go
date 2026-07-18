@@ -297,6 +297,7 @@ func (m *Model) resolveRelationships(s *Symbol, r *Result) {
 			target = m.InheritedMember(s.Parent, rel.target[0])
 		}
 		name := joinSegs(rel.target)
+		s.Relations = append(s.Relations, Relation{Kind: rel.kind, Name: name, Target: target, Range: rel.rng})
 		ref := RelRef{Kind: rel.kind, From: s.QualifiedName(), Name: name, Range: rel.rng, Resolved: target != nil}
 		if target != nil {
 			ref.Target = target.QualifiedName()

@@ -10,8 +10,9 @@ import (
 // enough that salsa's backdating (an edit that does not change diagnostics is
 // not propagated) stays inexpensive.
 type report struct {
-	diagnostics []Diagnostic
-	names       []ResolvedRef
+	diagnostics   []Diagnostic
+	names         []ResolvedRef
+	relationships []RelRef
 }
 
 // Db is the incremental façade over the HIR pipeline. Each source file is a
@@ -33,7 +34,7 @@ func NewDb() *Db {
 	d.analysis = salsa.NewQuery("hir.analysis", func(c *salsa.Ctx, key string) report {
 		src := d.source.Get(c, key)
 		r := Analyze(src)
-		return report{diagnostics: r.Diagnostics, names: r.Names}
+		return report{diagnostics: r.Diagnostics, names: r.Names, relationships: r.Relationships}
 	})
 	return d
 }
@@ -55,6 +56,15 @@ func (d *Db) Names(key string) []ResolvedRef {
 	var out []ResolvedRef
 	_ = d.sdb.Read(context.Background(), func(c *salsa.Ctx) {
 		out = d.analysis.Get(c, key).names
+	})
+	return out
+}
+
+// Relationships returns the resolved relationship references for a file key.
+func (d *Db) Relationships(key string) []RelRef {
+	var out []RelRef
+	_ = d.sdb.Read(context.Background(), func(c *salsa.Ctx) {
+		out = d.analysis.Get(c, key).relationships
 	})
 	return out
 }

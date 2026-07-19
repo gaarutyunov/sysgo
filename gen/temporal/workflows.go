@@ -38,7 +38,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 
 	for _, wf := range wfs {
 		params, steps := splitParamsAndSteps(wf.Element)
-		timers := timerAccepts(wf.Element)
+		accepts := bodyAccepts(wf.Element)
 		guards := guardByStep(wf.Element)
 		pStart, pEnd, hasFork := forkJoinSpan(wf.Element)
 		loops := wf.Element.Loops()
@@ -69,16 +69,23 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 			}
 			emittedParallel := false
 			loopIdx := 0
-			for _, it := range orderedBody(steps, timers, loops) {
+			for _, it := range orderedBody(steps, accepts, loops) {
 				if it.loop != nil {
 					emitLoop(g, *it.loop, params, loopIdx)
 					loopIdx++
 					continue
 				}
-				if it.timer != nil {
-					dur, ok := timerDuration(*it.timer)
+				if it.accept != nil {
+					a := *it.accept
+					if !a.IsTimer() {
+						// accept <signal> -> block on the signal channel.
+						g.Qual(sdkWorkflow, "GetSignalChannel").Call(jen.Id("ctx"), jen.Lit(a.Ref)).
+							Dot("Receive").Call(jen.Id("ctx"), jen.Nil())
+						continue
+					}
+					dur, ok := timerDuration(a)
 					if !ok {
-						g.Commentf("accept %s %s: unsupported timer expression", it.timer.Mode, it.timer.Ref)
+						g.Commentf("accept %s %s: unsupported timer expression", a.Mode, a.Ref)
 						continue
 					}
 					g.If(
@@ -230,15 +237,15 @@ func stepName(st *step) string {
 // bodyItem is one ordered element of a workflow body: an activity step or a
 // durable timer.
 type bodyItem struct {
-	start text.TextSize
-	step  *step
-	timer *engine.Accept
-	loop  *engine.Loop
+	start  text.TextSize
+	step   *step
+	accept *engine.Accept
+	loop   *engine.Loop
 }
 
 // orderedBody merges usage-based activity steps and timer accepts in source
 // order; perform-based steps (which have no source usage) are appended after.
-func orderedBody(steps []step, timers []engine.Accept, loops []engine.Loop) []bodyItem {
+func orderedBody(steps []step, accepts []engine.Accept, loops []engine.Loop) []bodyItem {
 	var ordered, performs []bodyItem
 	for i := range steps {
 		st := &steps[i]
@@ -248,8 +255,8 @@ func orderedBody(steps []step, timers []engine.Accept, loops []engine.Loop) []bo
 			performs = append(performs, bodyItem{step: st})
 		}
 	}
-	for i := range timers {
-		ordered = append(ordered, bodyItem{start: timers[i].Range.Start, timer: &timers[i]})
+	for i := range accepts {
+		ordered = append(ordered, bodyItem{start: accepts[i].Range.Start, accept: &accepts[i]})
 	}
 	for i := range loops {
 		ordered = append(ordered, bodyItem{start: loops[i].Range().Start, loop: &loops[i]})
@@ -258,16 +265,9 @@ func orderedBody(steps []step, timers []engine.Accept, loops []engine.Loop) []bo
 	return append(ordered, performs...)
 }
 
-// timerAccepts returns a workflow body's durable-timer accept statements
-// (`accept after` / `accept at`).
-func timerAccepts(wf engine.Element) []engine.Accept {
-	var out []engine.Accept
-	for _, a := range wf.Accepts() {
-		if a.IsTimer() {
-			out = append(out, a)
-		}
-	}
-	return out
+// bodyAccepts returns a workflow body's accept statements (timers and signals).
+func bodyAccepts(wf engine.Element) []engine.Accept {
+	return wf.Accepts()
 }
 
 // timerDuration renders the Go duration for a timer accept. A bare integer is

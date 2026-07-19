@@ -197,3 +197,35 @@ jobs:
             exit 1
           fi
           echo "No drift: committed generated code matches sysgo output."
+
+  examples-openapi:
+    name: Examples OpenAPI (integration)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: examples/openapi/go.sum
+      - name: Integration test against a real API container (testcontainers)
+        working-directory: examples/openapi
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+          INTEGRATION_COVERDIR: ${{ github.workspace }}/examples/openapi/covdata
+        run: |
+          mkdir -p "$INTEGRATION_COVERDIR"
+          go test -tags integration -v -timeout 20m ./...
+      - name: Convert container coverage to a profile
+        working-directory: examples/openapi
+        run: |
+          go tool covdata textfmt -i=covdata -o=coverage.out
+          go tool cover -func=coverage.out | tail -n 1
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: examples-openapi-coverage
+          path: examples/openapi/coverage.out
+          if-no-files-found: error

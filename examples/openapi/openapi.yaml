@@ -4,21 +4,6 @@ info:
   version: 1.0.0
 paths:
   /products:
-    get:
-      operationId: ListProducts
-      responses:
-        "200":
-          description: ListProducts succeeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Catalog.API.Product'
-        default:
-          description: error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
     post:
       operationId: CreateProduct
       requestBody:
@@ -30,6 +15,22 @@ paths:
       responses:
         "201":
           description: CreateProduct succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalog.API.Product'
+        default:
+          description: error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /products/featured:
+    get:
+      operationId: GetFeaturedProduct
+      responses:
+        "200":
+          description: GetFeaturedProduct succeeded
           content:
             application/json:
               schema:

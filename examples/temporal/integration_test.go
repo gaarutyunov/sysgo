@@ -118,7 +118,7 @@ func TestProcessOrderWorkflowAgainstRealTemporal(t *testing.T) {
 	// RunWorker blocks on the interrupt channel, so drive it in a goroutine and
 	// stop it after the workflow completes.
 	workerErr := make(chan error, 1)
-	go func() { workerErr <- orders.RunWorker(c, OrderActivities{}) }()
+	go func() { workerErr <- orders.RunWorker(c, &OrderActivities{}) }()
 
 	// Execute the generated workflow through the real client and wait for it.
 	run := executeWithRetry(ctx, t, c)

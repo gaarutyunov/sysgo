@@ -3,10 +3,13 @@ package temporal
 import (
 	"bytes"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/dave/jennifer/jen"
 
 	"github.com/gaarutyunov/sysgo/engine"
+	"github.com/gaarutyunov/sysgo/engine/text"
 )
 
 // GenerateWorkflows emits Go source for the model's @Workflow actions. Each
@@ -34,6 +37,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 
 	for _, wf := range wfs {
 		params, steps := splitParamsAndSteps(wf.Element)
+		timers := timerAccepts(wf.Element)
 		f.Func().Id(exported(wf.Name()) + "Workflow").ParamsFunc(func(p *jen.Group) {
 			p.Id("ctx").Qual(sdkWorkflow, "Context")
 			for _, param := range params {
@@ -51,7 +55,20 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 					}),
 				)
 			}
-			for _, step := range steps {
+			for _, it := range orderedBody(steps, timers) {
+				if it.timer != nil {
+					dur, ok := timerDuration(*it.timer)
+					if !ok {
+						g.Commentf("accept %s %s: unsupported timer expression", it.timer.Mode, it.timer.Ref)
+						continue
+					}
+					g.If(
+						jen.Err().Op(":=").Qual(sdkWorkflow, "Sleep").Call(jen.Id("ctx"), dur),
+						jen.Err().Op("!=").Nil(),
+					).Block(jen.Return(jen.Err()))
+					continue
+				}
+				step := it.step
 				g.If(
 					jen.Err().Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
 						c.Id("ctx")
@@ -74,6 +91,54 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// bodyItem is one ordered element of a workflow body: an activity step or a
+// durable timer.
+type bodyItem struct {
+	start text.TextSize
+	step  *step
+	timer *engine.Accept
+}
+
+// orderedBody merges usage-based activity steps and timer accepts in source
+// order; perform-based steps (which have no source usage) are appended after.
+func orderedBody(steps []step, timers []engine.Accept) []bodyItem {
+	var ordered, performs []bodyItem
+	for i := range steps {
+		st := &steps[i]
+		if st.usage.IsValid() {
+			ordered = append(ordered, bodyItem{start: st.usage.Range().Start, step: st})
+		} else {
+			performs = append(performs, bodyItem{step: st})
+		}
+	}
+	for i := range timers {
+		ordered = append(ordered, bodyItem{start: timers[i].Range.Start, timer: &timers[i]})
+	}
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].start < ordered[j].start })
+	return append(ordered, performs...)
+}
+
+// timerAccepts returns a workflow body's durable-timer accept statements
+// (`accept after` / `accept at`).
+func timerAccepts(wf engine.Element) []engine.Accept {
+	var out []engine.Accept
+	for _, a := range wf.Accepts() {
+		if a.IsTimer() {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// timerDuration renders the Go duration for a timer accept. A bare integer is
+// interpreted as seconds; non-literal durations are not yet supported.
+func timerDuration(a engine.Accept) (jen.Code, bool) {
+	if n, err := strconv.Atoi(strings.TrimSpace(a.Ref)); err == nil {
+		return jen.Lit(n).Op("*").Qual("time", "Second"), true
+	}
+	return nil, false
 }
 
 // step is one activity call within a workflow body.

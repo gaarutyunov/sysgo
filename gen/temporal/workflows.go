@@ -2,6 +2,7 @@ package temporal
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,6 +40,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		params, steps := splitParamsAndSteps(wf.Element)
 		timers := timerAccepts(wf.Element)
 		guards := guardByStep(wf.Element)
+		pStart, pEnd, hasFork := forkJoinSpan(wf.Element)
 		f.Func().Id(exported(wf.Name()) + "Workflow").ParamsFunc(func(p *jen.Group) {
 			p.Id("ctx").Qual(sdkWorkflow, "Context")
 			for _, param := range params {
@@ -56,6 +58,15 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 					}),
 				)
 			}
+			var parallelSteps []*step
+			if hasFork {
+				for i := range steps {
+					if inForkJoin(&steps[i], pStart, pEnd) {
+						parallelSteps = append(parallelSteps, &steps[i])
+					}
+				}
+			}
+			emittedParallel := false
 			for _, it := range orderedBody(steps, timers) {
 				if it.timer != nil {
 					dur, ok := timerDuration(*it.timer)
@@ -70,6 +81,13 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 					continue
 				}
 				step := it.step
+				if hasFork && inForkJoin(step, pStart, pEnd) {
+					if !emittedParallel {
+						emitParallel(g, parallelSteps, params)
+						emittedParallel = true
+					}
+					continue
+				}
 				exec := jen.If(
 					jen.Err().Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
 						c.Id("ctx")
@@ -98,6 +116,59 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// forkJoinSpan returns the source range between the first fork and a later join
+// control node, and whether such a span exists. Activity steps inside it run in
+// parallel (§3.1).
+func forkJoinSpan(wf engine.Element) (start, end text.TextSize, ok bool) {
+	var forkAt, joinAt text.TextSize
+	var hasFork, hasJoin bool
+	for _, cn := range wf.ControlNodes() {
+		switch cn.ControlKind() {
+		case "fork":
+			if !hasFork {
+				forkAt, hasFork = cn.Range().Start, true
+			}
+		case "join":
+			joinAt, hasJoin = cn.Range().Start, true
+		}
+	}
+	if hasFork && hasJoin && forkAt < joinAt {
+		return forkAt, joinAt, true
+	}
+	return 0, 0, false
+}
+
+// inForkJoin reports whether an activity step's source position lies in the
+// fork/join span.
+func inForkJoin(st *step, start, end text.TextSize) bool {
+	if !st.usage.IsValid() {
+		return false
+	}
+	p := st.usage.Range().Start
+	return start < p && p < end
+}
+
+// emitParallel starts every span activity as a Temporal future (non-blocking
+// ExecuteActivity), then Gets them all — the fork/join → parallel mapping.
+func emitParallel(g *jen.Group, steps []*step, params []engine.Element) {
+	for i, st := range steps {
+		st := st
+		g.Id(fmt.Sprintf("f%d", i)).Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
+			c.Id("ctx")
+			c.Lit(exported(st.activity.Name()))
+			for _, arg := range stepArgs(params, attributes(st.activity)) {
+				c.Add(arg)
+			}
+		})
+	}
+	for i := range steps {
+		g.If(
+			jen.Err().Op(":=").Id(fmt.Sprintf("f%d", i)).Dot("Get").Call(jen.Id("ctx"), jen.Nil()),
+			jen.Err().Op("!=").Nil(),
+		).Block(jen.Return(jen.Err()))
+	}
 }
 
 // guardByStep maps a workflow's guarded-succession target name to its guard
@@ -182,6 +253,9 @@ func splitParamsAndSteps(wf engine.Element) (params []engine.Element, steps []st
 	for _, child := range wf.Children() {
 		if child.Kind() != engine.ElementUsage {
 			continue
+		}
+		if child.IsControlNode() {
+			continue // fork/join etc. drive structure, they are not params
 		}
 		if act, ok := stepActivity(child); ok {
 			steps = append(steps, step{usage: child, activity: act})

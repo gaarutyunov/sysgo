@@ -12,13 +12,24 @@ import (
 //go:embed stdlib/*.sysml
 var stdlibFS embed.FS
 
+//go:embed profiles/*.sysml
+var profilesFS embed.FS
+
 // StdlibUnits returns the embedded standard-library source units, sorted by
 // path for a deterministic load order.
-func StdlibUnits() []hir.Unit {
-	entries, err := fs.ReadDir(stdlibFS, "stdlib")
+func StdlibUnits() []hir.Unit { return embeddedUnits(stdlibFS, "stdlib") }
+
+// ProfileUnits returns the embedded metadata-profile source units (e.g. the
+// REST profile), sorted by path.
+func ProfileUnits() []hir.Unit { return embeddedUnits(profilesFS, "profiles") }
+
+// embeddedUnits reads every .sysml file in an embedded directory, sorted by
+// name for deterministic load order.
+func embeddedUnits(fsys embed.FS, dir string) []hir.Unit {
+	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		// The embed directive guarantees the directory exists at build time.
-		panic("project: embedded stdlib missing: " + err.Error())
+		panic("project: embedded " + dir + " missing: " + err.Error())
 	}
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
@@ -30,11 +41,11 @@ func StdlibUnits() []hir.Unit {
 
 	units := make([]hir.Unit, 0, len(names))
 	for _, name := range names {
-		data, err := stdlibFS.ReadFile("stdlib/" + name)
+		data, err := fsys.ReadFile(dir + "/" + name)
 		if err != nil {
-			panic("project: reading embedded stdlib " + name + ": " + err.Error())
+			panic("project: reading embedded " + dir + "/" + name + ": " + err.Error())
 		}
-		units = append(units, hir.Unit{Key: "stdlib/" + name, Source: string(data)})
+		units = append(units, hir.Unit{Key: dir + "/" + name, Source: string(data)})
 	}
 	return units
 }
@@ -60,10 +71,11 @@ func (w *Workspace) AddFile(key, source string) {
 	w.files[key] = source
 }
 
-// units returns the standard library followed by the user files, in insertion
-// order.
+// units returns the standard library and bundled profiles followed by the user
+// files, in insertion order.
 func (w *Workspace) units() []hir.Unit {
 	units := StdlibUnits()
+	units = append(units, ProfileUnits()...)
 	for _, key := range w.order {
 		units = append(units, hir.Unit{Key: key, Source: w.files[key]})
 	}

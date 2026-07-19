@@ -128,10 +128,31 @@ func buildMember(parent *Symbol, m ast.Member) {
 	case ast.Declaration:
 		s := newSymbol(declKind(x), declName(x.Name()), parent, rangeOf(x))
 		s.rels = relSpecsOf(x)
+		s.Annotations = annotationsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
 	}
+}
+
+// annotationsOf reads a declaration's metadata annotations and their body
+// assignment values.
+func annotationsOf(d ast.Declaration) []Annotation {
+	var out []Annotation
+	for _, a := range d.Annotations() {
+		ann := Annotation{Values: map[string]string{}}
+		if n, ok := a.Name(); ok {
+			ann.Name = n.String()
+		}
+		for _, asn := range a.Assignments() {
+			if _, exists := ann.Values[asn.Name]; !exists {
+				ann.Keys = append(ann.Keys, asn.Name)
+			}
+			ann.Values[asn.Name] = asn.Value
+		}
+		out = append(out, ann)
+	}
+	return out
 }
 
 // relSpecsOf captures a declaration's relationship clauses before resolution.

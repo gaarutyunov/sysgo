@@ -113,6 +113,39 @@ func (e Element) LookupMember(name string) (Element, bool) {
 	return Element{}, false
 }
 
+// Metadata is a metadata annotation attached to an element, with its assignment
+// values read as text (e.g. an @REST annotation's path/method/status).
+type Metadata struct {
+	Name   string
+	Keys   []string
+	Values map[string]string
+}
+
+// Value returns the text of the assignment named key.
+func (m Metadata) Value(key string) (string, bool) {
+	v, ok := m.Values[key]
+	return v, ok
+}
+
+// Annotations returns the element's metadata annotations.
+func (e Element) Annotations() []Metadata {
+	out := make([]Metadata, len(e.sym.Annotations))
+	for i, a := range e.sym.Annotations {
+		out[i] = Metadata{Name: a.Name, Keys: a.Keys, Values: a.Values}
+	}
+	return out
+}
+
+// Metadata returns the first annotation with the given name, if any.
+func (e Element) Metadata(name string) (Metadata, bool) {
+	for _, a := range e.sym.Annotations {
+		if a.Name == name {
+			return Metadata{Name: a.Name, Keys: a.Keys, Values: a.Values}, true
+		}
+	}
+	return Metadata{}, false
+}
+
 // Relationships returns the element's resolved relationship clauses.
 func (e Element) Relationships() []Relationship {
 	out := make([]Relationship, len(e.sym.Relations))

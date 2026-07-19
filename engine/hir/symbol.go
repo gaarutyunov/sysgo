@@ -49,6 +49,10 @@ type Symbol struct {
 	// target symbols). Populated by relationship resolution.
 	Relations []Relation
 
+	// Annotations holds this symbol's metadata annotations (@Name { … }) with
+	// their body assignment values.
+	Annotations []Annotation
+
 	members map[string]*Symbol // local name → child (first wins on collision)
 	order   []*Symbol          // children in declaration order
 	imports []importSpec       // imports declared directly in this scope
@@ -90,6 +94,20 @@ type Relation struct {
 	Name   string  // the referenced target name
 	Target *Symbol // resolved target, or nil if unresolved
 	Range  text.TextRange
+}
+
+// Annotation is a metadata annotation (@Name { key = value; … }) attached to a
+// symbol, with its body assignments read as text.
+type Annotation struct {
+	Name   string            // e.g. "REST"
+	Keys   []string          // assignment names, in source order
+	Values map[string]string // assignment name → expression text
+}
+
+// Value returns the text of the assignment named key.
+func (a Annotation) Value(key string) (string, bool) {
+	v, ok := a.Values[key]
+	return v, ok
 }
 
 // relSpec is a relationship clause captured at build time, before resolution.

@@ -6,14 +6,15 @@ import (
 )
 
 // Schema is a subset of JSON Schema 2020-12 sufficient for the item-definition
-// mapping. Fields are ordered for stable JSON output.
+// mapping. Fields are ordered for stable JSON/YAML output.
 type Schema struct {
-	Type       string             `json:"type,omitempty"`
-	Format     string             `json:"format,omitempty"`
-	Properties map[string]*Schema `json:"properties,omitempty"`
-	Required   []string           `json:"required,omitempty"`
-	Items      *Schema            `json:"items,omitempty"`
-	Enum       []string           `json:"enum,omitempty"`
+	Ref        string             `json:"$ref,omitempty" yaml:"$ref,omitempty"`
+	Type       string             `json:"type,omitempty" yaml:"type,omitempty"`
+	Format     string             `json:"format,omitempty" yaml:"format,omitempty"`
+	Properties map[string]*Schema `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Required   []string           `json:"required,omitempty" yaml:"required,omitempty"`
+	Items      *Schema            `json:"items,omitempty" yaml:"items,omitempty"`
+	Enum       []string           `json:"enum,omitempty" yaml:"enum,omitempty"`
 }
 
 // JSON renders the schema as indented JSON. Map keys (properties) are emitted in

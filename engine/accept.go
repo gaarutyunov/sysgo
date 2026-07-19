@@ -1,12 +1,19 @@
 package engine
 
-import "github.com/gaarutyunov/sysgo/engine/hir"
+import (
+	"github.com/gaarutyunov/sysgo/engine/hir"
+	"github.com/gaarutyunov/sysgo/engine/text"
+)
 
 // Accept is a resolved `accept` statement within an action: a signal acceptance
 // or a durable timer (`accept after …` / `accept at …`).
 type Accept struct {
 	Mode string // "signal", "after", or "at"
 	Ref  string // the accepted reference/value as written
+
+	// Range is the accept statement's source range, for ordering timer steps
+	// against activity steps in a workflow body.
+	Range text.TextRange
 
 	target *hir.Symbol
 	model  *Model
@@ -28,7 +35,7 @@ func (a Accept) Target() (Element, bool) {
 func (e Element) Accepts() []Accept {
 	out := make([]Accept, len(e.sym.Accepts))
 	for i, a := range e.sym.Accepts {
-		out[i] = Accept{Mode: a.Mode, Ref: a.Ref, target: a.Target, model: e.model}
+		out[i] = Accept{Mode: a.Mode, Ref: a.Ref, Range: a.Range, target: a.Target, model: e.model}
 	}
 	return out
 }

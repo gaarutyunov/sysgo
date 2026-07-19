@@ -14,12 +14,17 @@ import (
 // (from GenerateActivities), calling each activity step in declaration order —
 // the succession → sequential mapping (specs/TEMPORAL.md §3, §3.1).
 //
-// The generated body invokes only the activity port (no side effects), which is
-// the determinism baseline (§6-A). Binding to the Temporal SDK
-// (workflow.ExecuteActivity, ActivityOptions, registration) is the worker slice.
+// Each workflow is a real Temporal workflow (workflow.Context) whose body calls
+// each activity via workflow.ExecuteActivity by registered name, in declaration
+// order — the succession → sequential mapping (§3, §3.1). Activity invocation
+// through the SDK (no direct side effects) is the determinism baseline (§6-A);
+// the activity implementations behind those names are the hand-written ports.
 //
-// The output belongs to the same package as GenerateActivities; it references
-// the Activities interface and the parameter structs defined there.
+// The output belongs to the same package as GenerateActivities; the worker
+// (GenerateWorker) registers these workflow functions and the Activities port.
+// sdkWorkflow is the Temporal workflow package the generated workflow bodies use.
+const sdkWorkflow = "go.temporal.io/sdk/workflow"
+
 func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 	wfs := Workflows(m)
 	sort.Slice(wfs, func(i, j int) bool { return wfs[i].Name() < wfs[j].Name() })
@@ -30,21 +35,31 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 	for _, wf := range wfs {
 		params, steps := splitParamsAndSteps(wf.Element)
 		f.Func().Id(exported(wf.Name()) + "Workflow").ParamsFunc(func(p *jen.Group) {
-			p.Id("ctx").Qual("context", "Context")
-			p.Id("acts").Id("Activities")
+			p.Id("ctx").Qual(sdkWorkflow, "Context")
 			for _, param := range params {
 				typeName, _, _ := goType(param)
 				p.Id(param.Name()).Id(typeName)
 			}
 		}).Error().BlockFunc(func(g *jen.Group) {
+			if len(steps) > 0 {
+				// Apply default activity options; per-activity @Timeout/@RetryPolicy
+				// wiring is carried by the Options map (GenerateActivities).
+				g.Id("ctx").Op("=").Qual(sdkWorkflow, "WithActivityOptions").Call(
+					jen.Id("ctx"),
+					jen.Qual(sdkWorkflow, "ActivityOptions").Values(jen.Dict{
+						jen.Id("StartToCloseTimeout"): jen.Qual("time", "Minute"),
+					}),
+				)
+			}
 			for _, step := range steps {
 				g.If(
-					jen.Err().Op(":=").Id("acts").Dot(exported(step.activity.Name())).CallFunc(func(c *jen.Group) {
+					jen.Err().Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
 						c.Id("ctx")
+						c.Lit(exported(step.activity.Name()))
 						for _, arg := range stepArgs(params, attributes(step.activity)) {
 							c.Add(arg)
 						}
-					}),
+					}).Dot("Get").Call(jen.Id("ctx"), jen.Nil()),
 					jen.Err().Op("!=").Nil(),
 				).Block(
 					jen.Return(jen.Err()),

@@ -171,3 +171,29 @@ jobs:
           name: examples-temporal-coverage
           path: examples/temporal/coverage.out
           if-no-files-found: error
+
+  examples-temporal-drift:
+    name: Examples Temporal (drift check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: examples/temporal/go.sum
+      - name: Regenerate the example from the model
+        working-directory: examples/temporal
+        run: go generate ./...
+      - name: Assert committed generated code is sysgo output (no drift)
+        run: |
+          if [ -n "$(git status --porcelain -- examples/temporal/orders)" ]; then
+            echo "::error::examples/temporal/orders is out of sync with 'sysgo gen temporal'."
+            echo "Regenerate with 'go generate ./...' in examples/temporal and commit the result."
+            git status --porcelain -- examples/temporal/orders
+            git diff -- examples/temporal/orders
+            exit 1
+          fi
+          echo "No drift: committed generated code matches sysgo output."

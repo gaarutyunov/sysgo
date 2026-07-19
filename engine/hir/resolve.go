@@ -89,6 +89,7 @@ func AnalyzeUnits(units []Unit) *Result {
 	m.resolveRelationships(root, r)
 	m.resolvePerforms(root)
 	m.resolveSuccessions(root)
+	m.resolveAccepts(root)
 	return r
 }
 
@@ -134,6 +135,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s.Keywords = x.Keywords()
 		s.performs = performSpecsOf(x)
 		s.successions = successionSpecsOf(x)
+		s.accepts = acceptSpecsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
@@ -190,6 +192,19 @@ func relSpecsOf(d ast.Declaration) []relSpec {
 func registerControlNode(parent *Symbol, cn ast.ControlNode) {
 	c := newSymbol(KindUsage, cn.Name(), parent, cn.Syntax().Range())
 	c.ControlKind = cn.Kind()
+}
+
+// acceptSpecsOf captures an action's accept statements before resolution.
+func acceptSpecsOf(d ast.Declaration) []acceptSpec {
+	var out []acceptSpec
+	for _, ac := range d.Accepts() {
+		spec := acceptSpec{mode: ac.Mode(), ref: ac.Ref(), rng: ac.Syntax().Range()}
+		if tgt, ok := ac.Target(); ok {
+			spec.target = segsOf(tgt)
+		}
+		out = append(out, spec)
+	}
+	return out
 }
 
 // successionSpecsOf captures an action's succession edges before resolution.
@@ -429,6 +444,20 @@ func (m *Model) resolveRelationships(s *Symbol, r *Result) {
 	}
 	for _, child := range s.order {
 		m.resolveRelationships(child, r)
+	}
+}
+
+// resolveAccepts resolves each action's accept references to symbols.
+func (m *Model) resolveAccepts(s *Symbol) {
+	for _, ac := range s.accepts {
+		stmt := AcceptStmt{Mode: ac.mode, Ref: ac.ref, Range: ac.rng}
+		if ac.target != nil {
+			stmt.Target = m.Resolve(s, ac.target)
+		}
+		s.Accepts = append(s.Accepts, stmt)
+	}
+	for _, child := range s.order {
+		m.resolveAccepts(child)
 	}
 }
 

@@ -55,6 +55,7 @@ func (p *PathItem) set(method string, op *Operation) {
 // Operation is one HTTP operation.
 type Operation struct {
 	OperationID string               `yaml:"operationId,omitempty"`
+	RequestBody *RequestBody         `yaml:"requestBody,omitempty"`
 	Responses   map[string]*Response `yaml:"responses,omitempty"`
 }
 
@@ -67,6 +68,12 @@ type Response struct {
 // MediaType is a response/request content entry for one media type.
 type MediaType struct {
 	Schema *Schema `yaml:"schema,omitempty"`
+}
+
+// RequestBody is an OpenAPI request body object.
+type RequestBody struct {
+	Required bool                  `yaml:"required,omitempty"`
+	Content  map[string]*MediaType `yaml:"content,omitempty"`
 }
 
 // Components holds the reusable component schemas.
@@ -178,13 +185,21 @@ func addOperation(paths map[string]*PathItem, e engine.Element, meta engine.Meta
 		paths[path] = item
 	}
 	ref, usedDefault := errorSchemaRef(e)
-	item.set(method, &Operation{
+	success := &Response{Description: e.Name() + " succeeded"}
+	if mt := bodySchemaFor(e, "out"); mt != nil {
+		success.Content = map[string]*MediaType{jsonMediaType: mt}
+	}
+	op := &Operation{
 		OperationID: e.Name(),
 		Responses: map[string]*Response{
-			status:    {Description: e.Name() + " succeeded"},
+			status:    success,
 			"default": errorResponse(ref),
 		},
-	})
+	}
+	if mt := bodySchemaFor(e, "in"); mt != nil {
+		op.RequestBody = &RequestBody{Required: true, Content: map[string]*MediaType{jsonMediaType: mt}}
+	}
+	item.set(method, op)
 	return usedDefault
 }
 
@@ -202,6 +217,60 @@ func unquote(s string) string {
 		return u
 	}
 	return s
+}
+
+const jsonMediaType = "application/json"
+
+// bodySchemaFor builds the media-type schema for an operation's request (dir
+// "in") or response (dir "out") body from the operation action's directed
+// parameters typed by item definitions. A single directed parameter refs its
+// type's component schema; multiple are wrapped in an object with one property
+// per parameter. Returns nil when the operation has no such parameter.
+func bodySchemaFor(op engine.Element, dir string) *MediaType {
+	var params []engine.Element
+	for _, c := range op.Children() {
+		if c.Kind() != engine.ElementUsage || c.Direction() != dir {
+			continue
+		}
+		if t, ok := paramSchemaType(c); ok {
+			_ = t
+			params = append(params, c)
+		}
+	}
+	switch len(params) {
+	case 0:
+		return nil
+	case 1:
+		t, _ := paramSchemaType(params[0])
+		return &MediaType{Schema: refSchema(t)}
+	default:
+		obj := &Schema{Type: "object", Properties: map[string]*Schema{}}
+		for _, p := range params {
+			t, _ := paramSchemaType(p)
+			obj.Properties[p.Name()] = refSchema(t)
+			obj.Required = append(obj.Required, p.Name())
+		}
+		sort.Strings(obj.Required)
+		return &MediaType{Schema: obj}
+	}
+}
+
+// paramSchemaType returns a directed parameter's item-definition type, if it is
+// typed by a definition (not a scalar) that becomes a component schema.
+func paramSchemaType(p engine.Element) (engine.Element, bool) {
+	t, ok := attributeType(p)
+	if !ok || isScalar(t.QualifiedName()) {
+		return engine.Element{}, false
+	}
+	if t.Kind() != engine.ElementDefinition {
+		return engine.Element{}, false
+	}
+	return t, true
+}
+
+// refSchema builds a $ref schema pointing at a definition's component schema.
+func refSchema(def engine.Element) *Schema {
+	return &Schema{Ref: "#/components/schemas/" + componentName(def.QualifiedName())}
 }
 
 // componentName turns a qualified name into an OpenAPI component key ("::" is

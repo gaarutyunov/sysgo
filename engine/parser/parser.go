@@ -101,6 +101,8 @@ func (p *parser) parseMember() {
 		p.parseAccept()
 	case kw == "transition":
 		p.parseTransition()
+	case kw == "loop":
+		p.parseLoop()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -521,7 +523,7 @@ func (p *parser) atMemberStart() bool {
 	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") ||
 		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") ||
 		isControlNodeKeyword(p.sigTokenN(0).Text) || p.atKeyword("accept") ||
-		p.atKeyword("transition") {
+		p.atKeyword("transition") || p.atKeyword("loop") {
 		return true
 	}
 	t := p.sigTokenN(0)
@@ -628,6 +630,31 @@ func (p *parser) parseTransitionGuard() {
 			p.bump()
 		}
 	}
+}
+
+// parseLoop parses a repetition, e.g. `loop 3 times Attempt;` or
+// `loop retries times Attempt;` — repeat the referenced activity <count> times.
+func (p *parser) parseLoop() {
+	p.b.StartNode(KindLoop.Raw())
+	p.bump() // 'loop'
+	switch p.current() {
+	case KindInt:
+		p.b.StartNode(KindExpr.Raw())
+		p.bump() // literal count
+		p.b.FinishNode()
+	case KindIdent, KindQuotedIdent:
+		p.parseQualifiedName() // count reference
+	}
+	if p.atKeyword("times") {
+		p.bump()
+	}
+	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+		p.parseQualifiedName() // activity reference
+	}
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
 }
 
 // isControlNodeKeyword reports the control-node keywords.

@@ -91,6 +91,7 @@ func AnalyzeUnits(units []Unit) *Result {
 	m.resolveSuccessions(root)
 	m.resolveAccepts(root)
 	m.resolveTransitions(root)
+	m.resolveLoops(root)
 	return r
 }
 
@@ -138,6 +139,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s.successions = successionSpecsOf(x)
 		s.accepts = acceptSpecsOf(x)
 		s.transitions = transitionSpecsOf(x)
+		s.loops = loopSpecsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
@@ -234,6 +236,19 @@ func transitionSpecsOf(d ast.Declaration) []transitionSpec {
 		}
 		if g, ok := tr.Guard(); ok {
 			spec.guard = g
+		}
+		out = append(out, spec)
+	}
+	return out
+}
+
+// loopSpecsOf captures an action's loop repetitions before resolution.
+func loopSpecsOf(d ast.Declaration) []loopSpec {
+	var out []loopSpec
+	for _, lp := range d.Loops() {
+		spec := loopSpec{count: lp.Count(), rng: lp.Syntax().Range()}
+		if tgt, ok := lp.Target(); ok {
+			spec.target = segsOf(tgt)
 		}
 		out = append(out, spec)
 	}
@@ -526,6 +541,20 @@ func (m *Model) resolveTransitions(s *Symbol) {
 	}
 	for _, child := range s.order {
 		m.resolveTransitions(child)
+	}
+}
+
+// resolveLoops resolves each loop's repeated-activity reference to a symbol.
+func (m *Model) resolveLoops(s *Symbol) {
+	for _, lp := range s.loops {
+		stmt := LoopStmt{Count: lp.count, TargetName: joinSegs(lp.target), Range: lp.rng}
+		if len(lp.target) > 0 {
+			stmt.Target = m.Resolve(s, lp.target)
+		}
+		s.Loops = append(s.Loops, stmt)
+	}
+	for _, child := range s.order {
+		m.resolveLoops(child)
 	}
 }
 

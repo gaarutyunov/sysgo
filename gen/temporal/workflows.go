@@ -41,6 +41,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		timers := timerAccepts(wf.Element)
 		guards := guardByStep(wf.Element)
 		pStart, pEnd, hasFork := forkJoinSpan(wf.Element)
+		loops := wf.Element.Loops()
 		f.Func().Id(exported(wf.Name()) + "Workflow").ParamsFunc(func(p *jen.Group) {
 			p.Id("ctx").Qual(sdkWorkflow, "Context")
 			for _, param := range params {
@@ -67,7 +68,13 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 				}
 			}
 			emittedParallel := false
-			for _, it := range orderedBody(steps, timers) {
+			loopIdx := 0
+			for _, it := range orderedBody(steps, timers, loops) {
+				if it.loop != nil {
+					emitLoop(g, *it.loop, params, loopIdx)
+					loopIdx++
+					continue
+				}
 				if it.timer != nil {
 					dur, ok := timerDuration(*it.timer)
 					if !ok {
@@ -116,6 +123,34 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// emitLoop renders a repetition as a Go for-loop running the target activity
+// Count times. Count is emitted verbatim (an int literal or a workflow param).
+func emitLoop(g *jen.Group, lp engine.Loop, params []engine.Element, idx int) {
+	tgt, ok := lp.Target()
+	if !ok || lp.Count == "" {
+		g.Commentf("loop %s times %s: unresolved", lp.Count, lp.TargetName)
+		return
+	}
+	iv := fmt.Sprintf("i%d", idx)
+	// int64(0) so the counter matches an Integer (int64) count parameter.
+	g.For(
+		jen.Id(iv).Op(":=").Id("int64").Call(jen.Lit(0)),
+		jen.Id(iv).Op("<").Id(lp.Count),
+		jen.Id(iv).Op("++"),
+	).Block(
+		jen.If(
+			jen.Err().Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
+				c.Id("ctx")
+				c.Lit(exported(tgt.Name()))
+				for _, arg := range stepArgs(params, attributes(tgt)) {
+					c.Add(arg)
+				}
+			}).Dot("Get").Call(jen.Id("ctx"), jen.Nil()),
+			jen.Err().Op("!=").Nil(),
+		).Block(jen.Return(jen.Err())),
+	)
 }
 
 // forkJoinSpan returns the source range between the first fork and a later join
@@ -198,11 +233,12 @@ type bodyItem struct {
 	start text.TextSize
 	step  *step
 	timer *engine.Accept
+	loop  *engine.Loop
 }
 
 // orderedBody merges usage-based activity steps and timer accepts in source
 // order; perform-based steps (which have no source usage) are appended after.
-func orderedBody(steps []step, timers []engine.Accept) []bodyItem {
+func orderedBody(steps []step, timers []engine.Accept, loops []engine.Loop) []bodyItem {
 	var ordered, performs []bodyItem
 	for i := range steps {
 		st := &steps[i]
@@ -214,6 +250,9 @@ func orderedBody(steps []step, timers []engine.Accept) []bodyItem {
 	}
 	for i := range timers {
 		ordered = append(ordered, bodyItem{start: timers[i].Range.Start, timer: &timers[i]})
+	}
+	for i := range loops {
+		ordered = append(ordered, bodyItem{start: loops[i].Range().Start, loop: &loops[i]})
 	}
 	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].start < ordered[j].start })
 	return append(ordered, performs...)

@@ -98,6 +98,7 @@ const (
 	KindControlNode  // fork/join/merge/decide node
 	KindAccept       // accept signal/after/at statement
 	KindTransition   // state transition (first … then …)
+	KindLoop         // loop <count> times <activity>
 )
 
 var kindNames = [...]string{
@@ -166,6 +167,7 @@ var kindNames = [...]string{
 	KindControlNode:   "ControlNode",
 	KindAccept:        "Accept",
 	KindTransition:    "Transition",
+	KindLoop:          "Loop",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

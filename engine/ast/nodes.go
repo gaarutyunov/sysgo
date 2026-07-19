@@ -310,6 +310,43 @@ func (a Annotation) Syntax() cst.Node { return a.node }
 // Name returns the annotated name, if present.
 func (a Annotation) Name() (QualifiedName, bool) { return qualifiedNameChild(a.node) }
 
+// Body returns the annotation's `{ ... }` assignment body, if it has one.
+func (a Annotation) Body() (Body, bool) { return bodyChild(a.node) }
+
+// Assignment is one `name = value` (or `name : type = value`) entry in an
+// annotation body. Value is the assigned expression text, empty when absent.
+type Assignment struct {
+	Name  string
+	Value string
+}
+
+// Assignments returns the annotation body's assignments in order.
+func (a Annotation) Assignments() []Assignment {
+	b, ok := a.Body()
+	if !ok {
+		return nil
+	}
+	var out []Assignment
+	for _, m := range b.Members() {
+		d, ok := m.(Declaration)
+		if !ok {
+			continue
+		}
+		name, ok := d.Name()
+		if !ok {
+			continue
+		}
+		asn := Assignment{Name: name.String()}
+		if fv, ok := d.FeatureValue(); ok {
+			if e, ok := fv.Expr(); ok {
+				asn.Value = e.Text()
+			}
+		}
+		out = append(out, asn)
+	}
+	return out
+}
+
 // --- shared child helpers ---
 
 func qualifiedNameChild(n cst.Node) (QualifiedName, bool) {

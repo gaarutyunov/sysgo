@@ -95,6 +95,8 @@ func (p *parser) parseMember() {
 		p.parsePerform()
 	case kw == "first" || kw == "then" || kw == "succession":
 		p.parseSuccession()
+	case isControlNodeKeyword(kw):
+		p.parseControlNode()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -513,11 +515,35 @@ func (p *parser) atMemberStart() bool {
 		return true
 	}
 	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") ||
-		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") {
+		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") ||
+		isControlNodeKeyword(p.sigTokenN(0).Text) {
 		return true
 	}
 	t := p.sigTokenN(0)
 	return t.Kind == KindIdent && isDeclKeyword(t.Text)
+}
+
+// isControlNodeKeyword reports the control-node keywords.
+func isControlNodeKeyword(s string) bool {
+	switch s {
+	case "fork", "join", "merge", "decide":
+		return true
+	default:
+		return false
+	}
+}
+
+// parseControlNode parses a control node, e.g. `fork f;` / `join;` / `decide d;`.
+func (p *parser) parseControlNode() {
+	p.b.StartNode(KindControlNode.Raw())
+	p.bump() // fork / join / merge / decide
+	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+		p.parseQualifiedName() // optional name
+	}
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
 }
 
 // parseSuccession parses a control-flow succession edge, e.g.

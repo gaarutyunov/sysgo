@@ -95,6 +95,7 @@ const (
 	KindMultiplicity // [ ... ] multiplicity after a type
 	KindPerform      // perform action reference
 	KindSuccession   // first A then B control edge
+	KindControlNode  // fork/join/merge/decide node
 )
 
 var kindNames = [...]string{
@@ -160,6 +161,7 @@ var kindNames = [...]string{
 	KindMultiplicity:  "Multiplicity",
 	KindPerform:       "Perform",
 	KindSuccession:    "Succession",
+	KindControlNode:   "ControlNode",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

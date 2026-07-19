@@ -97,6 +97,8 @@ func (p *parser) parseMember() {
 		p.parseSuccession()
 	case isControlNodeKeyword(kw):
 		p.parseControlNode()
+	case kw == "accept":
+		p.parseAccept()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -516,11 +518,34 @@ func (p *parser) atMemberStart() bool {
 	}
 	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") ||
 		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") ||
-		isControlNodeKeyword(p.sigTokenN(0).Text) {
+		isControlNodeKeyword(p.sigTokenN(0).Text) || p.atKeyword("accept") {
 		return true
 	}
 	t := p.sigTokenN(0)
 	return t.Kind == KindIdent && isDeclKeyword(t.Text)
+}
+
+// parseAccept parses an accept statement, e.g. `accept sig;`, `accept s : Sig;`,
+// `accept after 5;`, `accept at t;`.
+func (p *parser) parseAccept() {
+	p.b.StartNode(KindAccept.Raw())
+	p.bump() // 'accept'
+	if p.atKeyword("after") || p.atKeyword("at") {
+		p.bump() // 'after' / 'at'
+	}
+	switch p.current() {
+	case KindIdent, KindQuotedIdent:
+		p.parseQualifiedName() // signal reference or duration/time reference
+	case KindInt, KindReal, KindString:
+		p.b.StartNode(KindExpr.Raw())
+		p.bump() // a literal duration / time value
+		p.b.FinishNode()
+	}
+	p.parseRelationships() // optional `: SignalType`
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
 }
 
 // isControlNodeKeyword reports the control-node keywords.

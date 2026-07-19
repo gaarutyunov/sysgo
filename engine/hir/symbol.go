@@ -69,12 +69,16 @@ type Symbol struct {
 	// action's body, in declaration order.
 	Successions []SuccessionEdge
 
+	// Accepts holds the resolved `accept` statements in this action's body.
+	Accepts []AcceptStmt
+
 	members     map[string]*Symbol // local name → child (first wins on collision)
 	order       []*Symbol          // children in declaration order
 	imports     []importSpec       // imports declared directly in this scope
 	rels        []relSpec          // relationship clauses declared on this symbol
 	performs    []performSpec      // perform statements declared in this action body
 	successions []successionSpec   // succession edges declared in this action body
+	accepts     []acceptSpec       // accept statements declared in this action body
 	root        *Symbol
 }
 
@@ -144,6 +148,22 @@ type SuccessionEdge struct {
 	SourceName string
 	TargetName string
 	Range      text.TextRange
+}
+
+// AcceptStmt is a resolved `accept` statement.
+type AcceptStmt struct {
+	Mode   string
+	Ref    string
+	Target *Symbol
+	Range  text.TextRange
+}
+
+// acceptSpec is an accept statement captured at build time, before resolution.
+type acceptSpec struct {
+	mode   string
+	ref    string
+	target []string
+	rng    text.TextRange
 }
 
 // successionSpec is a succession edge captured at build time, before resolution.

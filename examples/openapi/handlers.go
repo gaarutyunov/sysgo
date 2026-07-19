@@ -10,32 +10,25 @@ import (
 )
 
 // Catalog is the hand-written implementation of the generated
-// api.ServerInterface. It keeps products in memory; a real service would use a
-// database. The generated types (api.CatalogAPIProduct) are the request/response
-// bodies, so the wire contract always matches the sysgo-generated schema.
+// api.ServerInterface. It keeps the featured product in memory; a real service
+// would use a database. The generated types (api.CatalogAPIProduct) are the
+// request/response bodies, so the wire contract always matches the
+// sysgo-generated schema.
 type Catalog struct {
 	mu       sync.Mutex
-	products []api.CatalogAPIProduct
+	featured api.CatalogAPIProduct
 }
 
-// NewCatalog returns a Catalog seeded with one product so GET /products returns
-// data out of the box.
+// NewCatalog returns a Catalog seeded with one product so GET
+// /products/featured returns data out of the box.
 func NewCatalog() *Catalog {
 	return &Catalog{
-		products: []api.CatalogAPIProduct{
-			{Id: "p-1", Name: "Widget", Price: 9.99},
-		},
+		featured: api.CatalogAPIProduct{Id: "p-1", Name: "Widget", Price: 9.99},
 	}
 }
 
-// ListProducts implements GET /products.
-func (c *Catalog) ListProducts(ctx *gin.Context) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ctx.JSON(http.StatusOK, c.products)
-}
-
-// CreateProduct implements POST /products.
+// CreateProduct implements POST /products: it stores the posted product as the
+// featured one and echoes it back.
 func (c *Catalog) CreateProduct(ctx *gin.Context) {
 	var product api.CatalogAPIProduct
 	if err := ctx.ShouldBindJSON(&product); err != nil {
@@ -47,9 +40,17 @@ func (c *Catalog) CreateProduct(ctx *gin.Context) {
 		return
 	}
 	c.mu.Lock()
-	c.products = append(c.products, product)
+	c.featured = product
 	c.mu.Unlock()
 	ctx.JSON(http.StatusCreated, product)
+}
+
+// GetFeaturedProduct implements GET /products/featured.
+func (c *Catalog) GetFeaturedProduct(ctx *gin.Context) {
+	c.mu.Lock()
+	product := c.featured
+	c.mu.Unlock()
+	ctx.JSON(http.StatusOK, product)
 }
 
 // compile-time assertion that the hand-written type satisfies the generated port.

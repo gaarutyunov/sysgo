@@ -29,11 +29,11 @@ type CreateProductJSONRequestBody = CatalogAPIProduct
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /products)
-	ListProducts(c *gin.Context)
-
 	// (POST /products)
 	CreateProduct(c *gin.Context)
+
+	// (GET /products/featured)
+	GetFeaturedProduct(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -44,19 +44,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
-
-// ListProducts operation middleware
-func (siw *ServerInterfaceWrapper) ListProducts(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListProducts(c)
-}
 
 // CreateProduct operation middleware
 func (siw *ServerInterfaceWrapper) CreateProduct(c *gin.Context) {
@@ -69,6 +56,19 @@ func (siw *ServerInterfaceWrapper) CreateProduct(c *gin.Context) {
 	}
 
 	siw.Handler.CreateProduct(c)
+}
+
+// GetFeaturedProduct operation middleware
+func (siw *ServerInterfaceWrapper) GetFeaturedProduct(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetFeaturedProduct(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -98,6 +98,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(options.BaseURL+"/products", wrapper.ListProducts)
 	router.POST(options.BaseURL+"/products", wrapper.CreateProduct)
+	router.GET(options.BaseURL+"/products/featured", wrapper.GetFeaturedProduct)
 }

@@ -1,0 +1,5 @@
+# The examples/openapi image builds from the repo root (the example module's
+# replace needs the core module). Keep VCS and local worktrees out of the build
+# context.
+.git
+.worktrees

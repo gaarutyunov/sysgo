@@ -41,6 +41,10 @@ type Symbol struct {
 	Parent *Symbol
 	Range  text.TextRange
 
+	// ControlKind is the control-node kind (fork/join/merge/decide) if this
+	// symbol is a control node, else "".
+	ControlKind string
+
 	// Supertypes holds the resolved specialization targets — the types this
 	// symbol inherits members from. Populated by relationship resolution.
 	Supertypes []*Symbol

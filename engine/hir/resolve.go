@@ -137,6 +137,9 @@ func buildMember(parent *Symbol, m ast.Member) {
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
+		for _, cn := range x.ControlNodes() {
+			registerControlNode(s, cn)
+		}
 	}
 }
 
@@ -180,6 +183,13 @@ func relSpecsOf(d ast.Declaration) []relSpec {
 		}
 	}
 	return out
+}
+
+// registerControlNode creates a symbol for a fork/join/merge/decide control node
+// so successions can reference it by name.
+func registerControlNode(parent *Symbol, cn ast.ControlNode) {
+	c := newSymbol(KindUsage, cn.Name(), parent, cn.Syntax().Range())
+	c.ControlKind = cn.Kind()
 }
 
 // successionSpecsOf captures an action's succession edges before resolution.

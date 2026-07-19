@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: API
+  version: 1.0.0
+paths:
+  /products:
+    get:
+      operationId: ListProducts
+      responses:
+        "200":
+          description: ListProducts succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalog.API.Product'
+        default:
+          description: error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+    post:
+      operationId: CreateProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Catalog.API.Product'
+      responses:
+        "201":
+          description: CreateProduct succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalog.API.Product'
+        default:
+          description: error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    Catalog.API.Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+      required:
+        - id
+        - name
+        - price
+    ProblemDetails:
+      type: object
+      properties:
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        status:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+          format: uri

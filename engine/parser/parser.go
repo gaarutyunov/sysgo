@@ -118,6 +118,11 @@ func (p *parser) lookaheadMemberKeyword() string {
 				}
 			}
 		}
+		// Skip an annotation body { ... } (balanced braces) so the member
+		// keyword after it is still found.
+		if p.sigTokenN(idx).Kind == KindLBrace {
+			idx = p.skipBraces(idx)
+		}
 	}
 	if t := p.sigTokenN(idx); t.Kind == KindIdent && isVisibility(t.Text) {
 		idx++
@@ -126,6 +131,26 @@ func (p *parser) lookaheadMemberKeyword() string {
 		return t.Text
 	}
 	return ""
+}
+
+// skipBraces returns the significant-token index just past a balanced { ... }
+// group that starts at index start. If braces never balance (malformed input),
+// it returns the index at EOF.
+func (p *parser) skipBraces(start int) int {
+	depth := 0
+	for i := start; ; i++ {
+		switch p.sigTokenN(i).Kind {
+		case KindLBrace:
+			depth++
+		case KindRBrace:
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		case KindEOF:
+			return i
+		}
+	}
 }
 
 func isVisibility(s string) bool {
@@ -191,11 +216,54 @@ func (p *parser) parsePrefix() {
 		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
 			p.parseQualifiedName()
 		}
+		// An annotation may carry a body of `name = value;` assignments, e.g.
+		// @REST { path = "/orders"; method = POST; }.
+		if p.current() == KindLBrace {
+			p.parseAnnotationBody()
+		}
 		p.b.FinishNode()
 	}
 	if p.atVisibility() {
 		p.bumpVisibility()
 	}
+}
+
+// parseAnnotationBody parses `{ name (: type)? (= value)? ; ... }` — a body of
+// bare feature-value assignments carried by a metadata annotation. Bare names
+// are not otherwise valid member starts, so this uses a dedicated assignment
+// parser rather than parseMember.
+func (p *parser) parseAnnotationBody() {
+	p.b.StartNode(KindBody.Raw())
+	p.bump() // '{'
+	for {
+		switch p.current() {
+		case KindRBrace:
+			p.bump() // '}'
+			p.b.FinishNode()
+			return
+		case KindEOF:
+			p.b.FinishNode() // unterminated — tolerant
+			return
+		case KindIdent, KindQuotedIdent:
+			p.parseAssignment()
+		default:
+			p.parseErrorMember() // stray token — recover, guaranteeing progress
+		}
+	}
+}
+
+// parseAssignment parses one `name (: type)? (= value)? ;` assignment as a
+// Usage node.
+func (p *parser) parseAssignment() {
+	cp := p.b.Checkpoint()
+	p.parseQualifiedName() // the assigned feature name
+	p.parseRelationships() // optional `: Type`
+	p.parseFeatureValueOpt()
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.StartNodeAt(cp, KindUsage.Raw())
+	p.b.FinishNode()
 }
 
 func (p *parser) bumpVisibility() {

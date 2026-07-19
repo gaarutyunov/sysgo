@@ -72,6 +72,10 @@ type Symbol struct {
 	// Accepts holds the resolved `accept` statements in this action's body.
 	Accepts []AcceptStmt
 
+	// Transitions holds the resolved state transitions in this state def's
+	// body, in declaration order.
+	Transitions []TransitionEdge
+
 	members     map[string]*Symbol // local name → child (first wins on collision)
 	order       []*Symbol          // children in declaration order
 	imports     []importSpec       // imports declared directly in this scope
@@ -79,6 +83,7 @@ type Symbol struct {
 	performs    []performSpec      // perform statements declared in this action body
 	successions []successionSpec   // succession edges declared in this action body
 	accepts     []acceptSpec       // accept statements declared in this action body
+	transitions []transitionSpec   // state transitions declared in this state def body
 	root        *Symbol
 }
 
@@ -164,6 +169,35 @@ type acceptSpec struct {
 	ref    string
 	target []string
 	rng    text.TextRange
+}
+
+// TransitionEdge is a resolved `transition … first … then …` state transition:
+// an optional name, resolved source/target states, an optional resolved trigger
+// signal and effect action, and the guard condition as written.
+type TransitionEdge struct {
+	Name       string
+	Source     *Symbol
+	Target     *Symbol
+	Trigger    *Symbol
+	Effect     *Symbol
+	SourceName string
+	TargetName string
+	TriggerRef string
+	EffectName string
+	Guard      string
+	Range      text.TextRange
+}
+
+// transitionSpec is a state transition captured at build time, before resolution.
+type transitionSpec struct {
+	name    string
+	source  []string
+	target  []string
+	trigger []string
+	effect  []string
+	trigRef string
+	guard   string
+	rng     text.TextRange
 }
 
 // successionSpec is a succession edge captured at build time, before resolution.

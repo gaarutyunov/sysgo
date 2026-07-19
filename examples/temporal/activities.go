@@ -27,5 +27,7 @@ func (OrderActivities) SendReceipt(ctx context.Context, order orders.Order) erro
 	return nil
 }
 
-// compile-time assertion that the hand-written type satisfies the generated port.
-var _ orders.Activities = OrderActivities{}
+// compile-time assertion that the hand-written type satisfies the generated
+// port. A *pointer* is what gets registered with the worker (see main.go), so
+// assert on the pointer type.
+var _ orders.Activities = (*OrderActivities)(nil)

@@ -25,7 +25,10 @@ func main() {
 	defer c.Close()
 
 	log.Printf("worker connected to %s, task queue \"orders\"", hostPort)
-	if err := orders.RunWorker(c, OrderActivities{}); err != nil {
+	// Register a *pointer* to the activities: Temporal's RegisterActivity accepts
+	// a function or a pointer-to-struct (whose methods become activities), not a
+	// bare struct value.
+	if err := orders.RunWorker(c, &OrderActivities{}); err != nil {
 		log.Fatalf("run worker: %v", err)
 	}
 }

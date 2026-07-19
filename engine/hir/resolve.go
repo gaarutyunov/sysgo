@@ -90,6 +90,7 @@ func AnalyzeUnits(units []Unit) *Result {
 	m.resolvePerforms(root)
 	m.resolveSuccessions(root)
 	m.resolveAccepts(root)
+	m.resolveTransitions(root)
 	return r
 }
 
@@ -136,6 +137,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s.performs = performSpecsOf(x)
 		s.successions = successionSpecsOf(x)
 		s.accepts = acceptSpecsOf(x)
+		s.transitions = transitionSpecsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
@@ -201,6 +203,37 @@ func acceptSpecsOf(d ast.Declaration) []acceptSpec {
 		spec := acceptSpec{mode: ac.Mode(), ref: ac.Ref(), rng: ac.Syntax().Range()}
 		if tgt, ok := ac.Target(); ok {
 			spec.target = segsOf(tgt)
+		}
+		out = append(out, spec)
+	}
+	return out
+}
+
+// transitionSpecsOf captures a state def's transitions before resolution.
+func transitionSpecsOf(d ast.Declaration) []transitionSpec {
+	var out []transitionSpec
+	for _, tr := range d.Transitions() {
+		spec := transitionSpec{rng: tr.Syntax().Range()}
+		if n, ok := tr.Name(); ok {
+			spec.name = n.String()
+		}
+		if src, ok := tr.Source(); ok {
+			spec.source = segsOf(src)
+		}
+		if tgt, ok := tr.Target(); ok {
+			spec.target = segsOf(tgt)
+		}
+		if trig, ok := tr.Trigger(); ok {
+			spec.trigger = segsOf(trig)
+		}
+		if txt, ok := tr.TriggerText(); ok {
+			spec.trigRef = txt
+		}
+		if eff, ok := tr.Effect(); ok {
+			spec.effect = segsOf(eff)
+		}
+		if g, ok := tr.Guard(); ok {
+			spec.guard = g
 		}
 		out = append(out, spec)
 	}
@@ -458,6 +491,38 @@ func (m *Model) resolveAccepts(s *Symbol) {
 	}
 	for _, child := range s.order {
 		m.resolveAccepts(child)
+	}
+}
+
+// resolveTransitions resolves each state def's transition source/target/trigger/
+// effect references to symbols.
+func (m *Model) resolveTransitions(s *Symbol) {
+	for _, tr := range s.transitions {
+		edge := TransitionEdge{
+			Name:       tr.name,
+			TriggerRef: tr.trigRef,
+			Guard:      tr.guard,
+			Range:      tr.rng,
+		}
+		if len(tr.source) > 0 {
+			edge.Source = m.Resolve(s, tr.source)
+			edge.SourceName = joinSegs(tr.source)
+		}
+		if len(tr.target) > 0 {
+			edge.Target = m.Resolve(s, tr.target)
+			edge.TargetName = joinSegs(tr.target)
+		}
+		if len(tr.trigger) > 0 {
+			edge.Trigger = m.Resolve(s, tr.trigger)
+		}
+		if len(tr.effect) > 0 {
+			edge.Effect = m.Resolve(s, tr.effect)
+			edge.EffectName = joinSegs(tr.effect)
+		}
+		s.Transitions = append(s.Transitions, edge)
+	}
+	for _, child := range s.order {
+		m.resolveTransitions(child)
 	}
 }
 

@@ -97,6 +97,7 @@ const (
 	KindSuccession   // first A then B control edge
 	KindControlNode  // fork/join/merge/decide node
 	KindAccept       // accept signal/after/at statement
+	KindTransition   // state transition (first … then …)
 )
 
 var kindNames = [...]string{
@@ -164,6 +165,7 @@ var kindNames = [...]string{
 	KindSuccession:    "Succession",
 	KindControlNode:   "ControlNode",
 	KindAccept:        "Accept",
+	KindTransition:    "Transition",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

@@ -99,6 +99,8 @@ func (p *parser) parseMember() {
 		p.parseControlNode()
 	case kw == "accept":
 		p.parseAccept()
+	case kw == "transition":
+		p.parseTransition()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -518,7 +520,8 @@ func (p *parser) atMemberStart() bool {
 	}
 	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") ||
 		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") ||
-		isControlNodeKeyword(p.sigTokenN(0).Text) || p.atKeyword("accept") {
+		isControlNodeKeyword(p.sigTokenN(0).Text) || p.atKeyword("accept") ||
+		p.atKeyword("transition") {
 		return true
 	}
 	t := p.sigTokenN(0)
@@ -546,6 +549,85 @@ func (p *parser) parseAccept() {
 		p.bump()
 	}
 	p.b.FinishNode()
+}
+
+// parseTransition parses a state transition inside a `state def` body, e.g.
+//
+//	transition first S1 then S2;
+//	transition T1 first S1 accept sig if guard do effect then S2;
+//
+// The optional leading name, `first` source, `accept` trigger, `if` guard,
+// `do` effect, and `then` target are each optional except that a well-formed
+// transition names a target. Parsing is tolerant: any missing clause is simply
+// absent from the node.
+func (p *parser) parseTransition() {
+	p.b.StartNode(KindTransition.Raw())
+	p.bump() // 'transition'
+	// Optional transition name: a qualified name before the `first` keyword.
+	if c := p.current(); (c == KindIdent || c == KindQuotedIdent) && !p.atKeyword("first") {
+		p.parseQualifiedName()
+	}
+	if p.atKeyword("first") {
+		p.bump()
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName() // source state
+		}
+	}
+	if p.atKeyword("accept") {
+		p.bump()
+		if p.atKeyword("after") || p.atKeyword("at") {
+			p.bump()
+		}
+		switch p.current() {
+		case KindIdent, KindQuotedIdent:
+			p.parseQualifiedName() // trigger signal reference
+		case KindInt, KindReal, KindString:
+			p.b.StartNode(KindExpr.Raw())
+			p.bump() // literal duration / time value
+			p.b.FinishNode()
+		}
+		p.parseRelationships() // optional `: SignalType` binding on the trigger
+	}
+	if p.atKeyword("if") {
+		p.bump()
+		p.parseTransitionGuard()
+	}
+	if p.atKeyword("do") {
+		p.bump()
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName() // effect action reference
+		}
+	}
+	if p.atKeyword("then") {
+		p.bump()
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName() // target state
+		}
+	}
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
+}
+
+// parseTransitionGuard wraps the guard condition — every token between `if` and
+// the following `do`/`then`/`;`/`}` — in an Expr node. The guard may be an
+// arbitrary boolean expression, so it is captured losslessly as raw tokens
+// rather than parsed into structure for this slice.
+func (p *parser) parseTransitionGuard() {
+	p.b.StartNode(KindExpr.Raw())
+	for {
+		switch c := p.current(); {
+		case c == KindEOF || c == KindRBrace || c == KindSemicolon:
+			p.b.FinishNode()
+			return
+		case p.atKeyword("do") || p.atKeyword("then"):
+			p.b.FinishNode()
+			return
+		default:
+			p.bump()
+		}
+	}
 }
 
 // isControlNodeKeyword reports the control-node keywords.

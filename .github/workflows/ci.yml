@@ -229,3 +229,29 @@ jobs:
           name: examples-openapi-coverage
           path: examples/openapi/coverage.out
           if-no-files-found: error
+
+  examples-openapi-drift:
+    name: Examples OpenAPI (drift check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: examples/openapi/go.sum
+      - name: Regenerate the example from the model (sysgo gen openapi + oapi-codegen)
+        working-directory: examples/openapi
+        run: go generate ./...
+      - name: Assert committed generated code is sysgo/oapi-codegen output (no drift)
+        run: |
+          if [ -n "$(git status --porcelain -- examples/openapi/openapi.yaml examples/openapi/api)" ]; then
+            echo "::error::examples/openapi generated code is out of sync with the model."
+            echo "Regenerate with 'go generate ./...' in examples/openapi and commit the result."
+            git status --porcelain -- examples/openapi/openapi.yaml examples/openapi/api
+            git diff -- examples/openapi/openapi.yaml examples/openapi/api
+            exit 1
+          fi
+          echo "No drift: committed openapi.yaml and api/ match sysgo + oapi-codegen output."

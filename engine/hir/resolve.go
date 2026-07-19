@@ -129,6 +129,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s := newSymbol(declKind(x), declName(x.Name()), parent, rangeOf(x))
 		s.rels = relSpecsOf(x)
 		s.Annotations = annotationsOf(x)
+		s.Keywords = x.Keywords()
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}

@@ -132,7 +132,7 @@ func (d *Document) YAML() string {
 // contracts.
 func isBundledPackage(name string) bool {
 	switch name {
-	case "ScalarValues", "Base", "RESTProfile":
+	case "ScalarValues", "Base", "RESTProfile", "TemporalProfile":
 		return true
 	default:
 		return false

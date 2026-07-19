@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gaarutyunov/sysgo/engine"
+	"github.com/gaarutyunov/sysgo/gen/contracts"
 	"github.com/gaarutyunov/sysgo/gen/temporal"
 )
 
@@ -21,7 +22,53 @@ func newGenCmd() *cobra.Command {
 		Short: "Generate code from a SysML model using the engine-based generators",
 	}
 	cmd.AddCommand(newGenTemporalCmd())
+	cmd.AddCommand(newGenOpenAPICmd())
 	return cmd
+}
+
+func newGenOpenAPICmd() *cobra.Command {
+	var out string
+	cmd := &cobra.Command{
+		Use:   "openapi <model.sysml>",
+		Short: "Generate an OpenAPI 3.1 document from a SysML model",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runGenOpenAPI(cmd, args[0], out)
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "openapi.yaml", "output OpenAPI document path")
+	return cmd
+}
+
+// runGenOpenAPI loads the model and writes the OpenAPI document deterministically,
+// so the same command drives both the example scaffolding and the drift check.
+func runGenOpenAPI(cmd *cobra.Command, modelPath, out string) error {
+	src, err := os.ReadFile(modelPath)
+	if err != nil {
+		return err
+	}
+	m := engine.New().AddFile(filepath.Base(modelPath), string(src)).Build()
+	if diags := m.Diagnostics(); len(diags) > 0 {
+		var b strings.Builder
+		fmt.Fprintf(&b, "model %s has %d diagnostic(s):", modelPath, len(diags))
+		for _, d := range diags {
+			fmt.Fprintf(&b, "\n  %s", d.Message)
+		}
+		return fmt.Errorf("%s", b.String())
+	}
+
+	doc := contracts.BuildDocument(m)
+	if dir := filepath.Dir(out); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(out, []byte(doc.YAML()), 0o644); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "sysgo: wrote OpenAPI document to %s (%d schema(s))\n", out, len(doc.SchemaNames()))
+	return nil
 }
 
 func newGenTemporalCmd() *cobra.Command {

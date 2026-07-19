@@ -91,6 +91,8 @@ func (p *parser) parseMember() {
 		p.parseImport()
 	case kw == "package":
 		p.parsePackage()
+	case kw == "perform":
+		p.parsePerform()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -508,11 +510,30 @@ func (p *parser) atMemberStart() bool {
 	if p.current() == KindAt || p.current() == KindHash || p.atVisibility() {
 		return true
 	}
-	if p.atKeyword("import") || p.atKeyword("package") {
+	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") {
 		return true
 	}
 	t := p.sigTokenN(0)
 	return t.Kind == KindIdent && isDeclKeyword(t.Text)
+}
+
+// parsePerform parses a `perform` action reference, e.g.
+//
+//	perform action charge : ChargeCard;   or   perform ChargeCard;
+func (p *parser) parsePerform() {
+	p.b.StartNode(KindPerform.Raw())
+	p.bump() // 'perform'
+	if p.atKeyword("action") {
+		p.bump()
+	}
+	if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+		p.parseQualifiedName()
+	}
+	p.parseRelationships() // optional `: Target`
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
 }
 
 // parseErrorToken wraps a single unexpected significant token in an error node.

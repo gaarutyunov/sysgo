@@ -81,6 +81,14 @@ func splitParamsAndSteps(wf engine.Element) (params []engine.Element, steps []st
 		}
 		params = append(params, child)
 	}
+	// `perform` statements targeting an @Activity are activity steps too.
+	for _, pf := range wf.Performs() {
+		if tgt, ok := pf.Target(); ok {
+			if _, isActivity := tgt.Metadata("Activity"); isActivity {
+				steps = append(steps, step{activity: tgt})
+			}
+		}
+	}
 	return params, steps
 }
 

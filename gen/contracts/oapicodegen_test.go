@@ -115,7 +115,7 @@ func writeModule(t *testing.T, dir, src, require string) {
 	if err := os.WriteFile(filepath.Join(dir, "gen.go"), []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	mod := "module gen\n\ngo 1.26.4\n"
+	mod := "module gen\n\ngo 1.26.5\n"
 	if require != "" {
 		mod += "\nrequire " + require + "\n"
 		if sum, err := os.ReadFile(parentGoSum(t)); err == nil {

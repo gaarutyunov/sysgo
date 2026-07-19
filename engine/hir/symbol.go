@@ -61,12 +61,17 @@ type Symbol struct {
 	// body, in declaration order.
 	Performs []PerformStep
 
-	members  map[string]*Symbol // local name → child (first wins on collision)
-	order    []*Symbol          // children in declaration order
-	imports  []importSpec       // imports declared directly in this scope
-	rels     []relSpec          // relationship clauses declared on this symbol
-	performs []performSpec      // perform statements declared in this action body
-	root     *Symbol
+	// Successions holds the resolved `first A then B` control edges in this
+	// action's body, in declaration order.
+	Successions []SuccessionEdge
+
+	members     map[string]*Symbol // local name → child (first wins on collision)
+	order       []*Symbol          // children in declaration order
+	imports     []importSpec       // imports declared directly in this scope
+	rels        []relSpec          // relationship clauses declared on this symbol
+	performs    []performSpec      // perform statements declared in this action body
+	successions []successionSpec   // succession edges declared in this action body
+	root        *Symbol
 }
 
 // RelKind classifies a KerML relationship clause.
@@ -126,6 +131,22 @@ type PerformStep struct {
 	Target *Symbol // resolved target action, or nil if unresolved
 	Name0  string  // the referenced target name as written
 	Range  text.TextRange
+}
+
+// SuccessionEdge is a resolved `first A then B` control edge.
+type SuccessionEdge struct {
+	Source     *Symbol
+	Target     *Symbol
+	SourceName string
+	TargetName string
+	Range      text.TextRange
+}
+
+// successionSpec is a succession edge captured at build time, before resolution.
+type successionSpec struct {
+	source []string
+	target []string
+	rng    text.TextRange
 }
 
 // performSpec is a perform statement captured at build time, before resolution.

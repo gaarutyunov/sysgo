@@ -60,7 +60,13 @@ type Operation struct {
 
 // Response is one HTTP response.
 type Response struct {
-	Description string `yaml:"description"`
+	Description string                `yaml:"description"`
+	Content     map[string]*MediaType `yaml:"content,omitempty"`
+}
+
+// MediaType is a response/request content entry for one media type.
+type MediaType struct {
+	Schema *Schema `yaml:"schema,omitempty"`
 }
 
 // Components holds the reusable component schemas.
@@ -70,15 +76,19 @@ type Components struct {
 
 // BuildDocument assembles an OpenAPI 3.1 document from a resolved model:
 // components/schemas from definitions that have attributes, and paths from
-// @REST-annotated operations.
+// @REST-annotated operations. Each operation gets a default error response
+// (RFC 9457 Problem Details, or an @ErrorModel override).
 func BuildDocument(m *engine.Model) *Document {
 	doc := &Document{OpenAPI: "3.1.0", Info: Info{Title: "API", Version: "1.0.0"}}
 	schemas := map[string]*Schema{}
 	paths := map[string]*PathItem{}
+	needProblemDetails := false
 
 	visit := func(e engine.Element) {
 		if meta, ok := e.Metadata("REST"); ok {
-			addOperation(paths, e, meta)
+			if addOperation(paths, e, meta) {
+				needProblemDetails = true
+			}
 			return // an operation is not itself a data schema
 		}
 		if isSchemaDefinition(e) {
@@ -94,6 +104,9 @@ func BuildDocument(m *engine.Model) *Document {
 		walk(top, visit)
 	}
 
+	if needProblemDetails {
+		schemas[ProblemDetailsSchemaName] = problemDetailsSchema()
+	}
 	if len(schemas) > 0 {
 		doc.Components = &Components{Schemas: schemas}
 	}
@@ -152,7 +165,9 @@ func isSchemaDefinition(e engine.Element) bool {
 	return false
 }
 
-func addOperation(paths map[string]*PathItem, e engine.Element, meta engine.Metadata) {
+// addOperation adds an operation for an @REST element and returns whether it
+// used the default Problem Details error schema (vs. an @ErrorModel override).
+func addOperation(paths map[string]*PathItem, e engine.Element, meta engine.Metadata) bool {
 	path := unquote(valueOr(meta, "path", "/"+e.Name()))
 	method := unquote(valueOr(meta, "method", "GET"))
 	status := unquote(valueOr(meta, "successStatus", "200"))
@@ -162,12 +177,15 @@ func addOperation(paths map[string]*PathItem, e engine.Element, meta engine.Meta
 		item = &PathItem{}
 		paths[path] = item
 	}
+	ref, usedDefault := errorSchemaRef(e)
 	item.set(method, &Operation{
 		OperationID: e.Name(),
 		Responses: map[string]*Response{
-			status: {Description: e.Name() + " succeeded"},
+			status:    {Description: e.Name() + " succeeded"},
+			"default": errorResponse(ref),
 		},
 	})
+	return usedDefault
 }
 
 func valueOr(meta engine.Metadata, key, fallback string) string {

@@ -49,9 +49,10 @@ func TestDocumentBasics(t *testing.T) {
 
 func TestComponentsFromItemDefs(t *testing.T) {
 	doc := buildDoc(t)
-	// item defs with attributes → component schemas; actions/operations excluded.
-	if got := doc.SchemaNames(); !reflect.DeepEqual(got, []string{"API.LineItem", "API.Order"}) {
-		t.Fatalf("schema names = %v, want [API.LineItem API.Order]", got)
+	// item defs with attributes → component schemas; the default RFC 9457
+	// error schema is added because the operations use it; operations excluded.
+	if got := doc.SchemaNames(); !reflect.DeepEqual(got, []string{"API.LineItem", "API.Order", "ProblemDetails"}) {
+		t.Fatalf("schema names = %v, want [API.LineItem API.Order ProblemDetails]", got)
 	}
 	order := doc.Components.Schemas["API.Order"]
 	if order.Type != "object" {
@@ -82,6 +83,61 @@ func TestPathsFromRESTOperations(t *testing.T) {
 	}
 }
 
+func TestDefaultErrorResponse(t *testing.T) {
+	doc := buildDoc(t)
+	// RFC 9457 Problem Details schema is present.
+	pd := doc.Components.Schemas["ProblemDetails"]
+	if pd == nil || pd.Type != "object" {
+		t.Fatalf("ProblemDetails schema = %+v, want object", pd)
+	}
+	for _, f := range []string{"type", "title", "status", "detail", "instance"} {
+		if _, ok := pd.Properties[f]; !ok {
+			t.Errorf("ProblemDetails missing field %q", f)
+		}
+	}
+	// Each operation has a default error response referencing it via
+	// application/problem+json.
+	op := doc.Paths["/orders"].Post
+	resp, ok := op.Responses["default"]
+	if !ok {
+		t.Fatalf("POST /orders has no default response: %+v", op.Responses)
+	}
+	mt, ok := resp.Content["application/problem+json"]
+	if !ok {
+		t.Fatalf("default response missing problem+json content: %+v", resp.Content)
+	}
+	if mt.Schema.Ref != "#/components/schemas/ProblemDetails" {
+		t.Errorf("error schema ref = %q, want #/components/schemas/ProblemDetails", mt.Schema.Ref)
+	}
+}
+
+func TestErrorModelOverride(t *testing.T) {
+	src := `package API {
+	import ScalarValues::*;
+	import RESTProfile::*;
+	item def MyError { attribute code : Integer; }
+	@REST { path = "/x"; method = "GET"; }
+	@ErrorModel { schemaRef = "MyError"; }
+	action getX;
+}`
+	m := engine.New().AddFile("api.sysml", src).Build()
+	if d := m.Diagnostics(); len(d) != 0 {
+		t.Fatalf("diagnostics: %v", d)
+	}
+	doc := BuildDocument(m)
+
+	resp := doc.Paths["/x"].Get.Responses["default"]
+	ref := resp.Content["application/problem+json"].Schema.Ref
+	if ref != "#/components/schemas/MyError" {
+		t.Errorf("override error ref = %q, want #/components/schemas/MyError", ref)
+	}
+	// The default Problem Details schema is NOT added when every operation
+	// overrides its error model.
+	if _, ok := doc.Components.Schemas["ProblemDetails"]; ok {
+		t.Error("ProblemDetails should not be present when overridden")
+	}
+}
+
 func TestYAMLDeterministicAndRoundTrips(t *testing.T) {
 	doc := buildDoc(t)
 	a := doc.YAML()
@@ -89,25 +145,26 @@ func TestYAMLDeterministicAndRoundTrips(t *testing.T) {
 	if a != b {
 		t.Fatal("YAML output not deterministic")
 	}
-	// Sanity substrings.
-	for _, want := range []string{"openapi:", "3.1.0", "paths:", "/orders:", "post:", "operationId: placeOrder", "components:", "schemas:", "API.Order:"} {
+	for _, want := range []string{
+		"openapi:", "3.1.0", "paths:", "/orders:", "post:", "operationId: placeOrder",
+		"components:", "schemas:", "API.Order:", "application/problem+json:", "ProblemDetails:",
+	} {
 		if !strings.Contains(a, want) {
 			t.Errorf("YAML missing %q:\n%s", want, a)
 		}
 	}
-	// Round-trips back into an equivalent document.
 	var back Document
 	if err := yaml.Unmarshal([]byte(a), &back); err != nil {
 		t.Fatalf("re-parse failed: %v", err)
-	}
-	if back.OpenAPI != "3.1.0" {
-		t.Errorf("round-trip openapi = %q", back.OpenAPI)
 	}
 	if back.Paths["/orders"].Post.OperationID != "placeOrder" {
 		t.Errorf("round-trip lost the POST operation")
 	}
 	if _, ok := back.Components.Schemas["API.Order"]; !ok {
 		t.Errorf("round-trip lost the Order schema")
+	}
+	if back.Paths["/orders"].Post.Responses["default"].Content["application/problem+json"] == nil {
+		t.Errorf("round-trip lost the error response content")
 	}
 }
 

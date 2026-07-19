@@ -45,11 +45,11 @@ func TestPerformBasedWorkflow(t *testing.T) {
 	compileFiles(t, map[string]string{"activities.go": acts, "workflows.go": wf})
 
 	n := norm(wf)
-	if !strings.Contains(n, "func ProcessOrderWorkflow(ctx context.Context, acts Activities, order Order) error") {
+	if !strings.Contains(n, "func ProcessOrderWorkflow(ctx workflow.Context, order Order) error") {
 		t.Errorf("workflow signature wrong:\n%s", wf)
 	}
-	ci := strings.Index(n, "acts.ChargeCard(ctx, order)")
-	si := strings.Index(n, "acts.SendReceipt(ctx, order)")
+	ci := strings.Index(n, `workflow.ExecuteActivity(ctx, "ChargeCard", order)`)
+	si := strings.Index(n, `workflow.ExecuteActivity(ctx, "SendReceipt", order)`)
 	if ci < 0 || si < 0 {
 		t.Fatalf("perform steps not emitted as activity calls:\n%s", wf)
 	}

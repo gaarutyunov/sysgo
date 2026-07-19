@@ -41,13 +41,20 @@ func buildWorkflowModel(t *testing.T) *engine.Model {
 	return m
 }
 
-// compileFiles writes several generated files into one throwaway module and
-// runs `go build`, verifying they compile together (stdlib-only, offline).
+// compileFiles writes several generated files into one throwaway module that
+// requires the Temporal SDK and runs `go build`, verifying they compile
+// together. The blank imports in sdkdeps_test.go keep the SDK in the module
+// cache so this resolves without perturbing the network in the common case.
 func compileFiles(t *testing.T, files map[string]string) {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module gen\n\ngo 1.25\n"), 0o644); err != nil {
+	mod := "module gen\n\ngo 1.26.5\n\nrequire go.temporal.io/sdk " +
+		moduleVersion(t, "go.temporal.io/sdk") + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if sum, err := os.ReadFile(parentGoSum(t)); err == nil {
+		_ = os.WriteFile(filepath.Join(dir, "go.sum"), sum, 0o644)
 	}
 	for name, src := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(src), 0o644); err != nil {
@@ -56,9 +63,30 @@ func compileFiles(t *testing.T, files map[string]string) {
 	}
 	cmd := exec.Command("go", "build", "./...")
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("generated code did not compile: %v\n%s", err, out)
 	}
+}
+
+// moduleVersion returns the selected version of a module in the parent module.
+func moduleVersion(t *testing.T, path string) string {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Version}}", path).Output()
+	if err != nil {
+		t.Fatalf("go list -m %s: %v", path, err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// parentGoSum returns the path to the parent module's go.sum.
+func parentGoSum(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("go", "env", "GOMOD").Output()
+	if err != nil {
+		t.Fatalf("go env GOMOD: %v", err)
+	}
+	return filepath.Join(filepath.Dir(strings.TrimSpace(string(out))), "go.sum")
 }
 
 func TestGeneratedWorkflowCompiles(t *testing.T) {
@@ -82,19 +110,22 @@ func TestWorkflowShapeAndOrder(t *testing.T) {
 	}
 	n := norm(src)
 
-	if !strings.Contains(n, "func ProcessOrderWorkflow(ctx context.Context, acts Activities, order Order) error") {
+	if !strings.Contains(n, "func ProcessOrderWorkflow(ctx workflow.Context, order Order) error") {
 		t.Errorf("workflow signature wrong:\n%s", src)
 	}
-	// The activity steps are called in declaration order.
-	ci := strings.Index(n, "acts.ChargeCard(ctx, order)")
-	si := strings.Index(n, "acts.SendReceipt(ctx, order)")
+	if !strings.Contains(n, "workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: time.Minute})") {
+		t.Errorf("activity options not applied:\n%s", src)
+	}
+	// The activities are executed by name, in declaration order.
+	ci := strings.Index(n, `workflow.ExecuteActivity(ctx, "ChargeCard", order)`)
+	si := strings.Index(n, `workflow.ExecuteActivity(ctx, "SendReceipt", order)`)
 	if ci < 0 || si < 0 {
 		t.Fatalf("missing activity calls; got:\n%s", src)
 	}
 	if ci > si {
 		t.Errorf("activity calls out of order (charge should precede notify):\n%s", src)
 	}
-	if !strings.Contains(n, "if err := acts.ChargeCard(ctx, order); err != nil { return err }") {
+	if !strings.Contains(n, `if err := workflow.ExecuteActivity(ctx, "ChargeCard", order).Get(ctx, nil); err != nil { return err }`) {
 		t.Errorf("step error handling wrong:\n%s", src)
 	}
 }

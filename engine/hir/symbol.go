@@ -53,6 +53,10 @@ type Symbol struct {
 	// their body assignment values.
 	Annotations []Annotation
 
+	// Keywords holds the declaration's leading keyword tokens (modifiers, kind
+	// keyword, and optional "def"), used to expose direction and kind.
+	Keywords []string
+
 	members map[string]*Symbol // local name → child (first wins on collision)
 	order   []*Symbol          // children in declaration order
 	imports []importSpec       // imports declared directly in this scope

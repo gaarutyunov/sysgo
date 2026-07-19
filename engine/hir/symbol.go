@@ -76,6 +76,10 @@ type Symbol struct {
 	// body, in declaration order.
 	Transitions []TransitionEdge
 
+	// Loops holds the resolved `loop … times …` repetitions in this action's
+	// body, in declaration order.
+	Loops []LoopStmt
+
 	members     map[string]*Symbol // local name → child (first wins on collision)
 	order       []*Symbol          // children in declaration order
 	imports     []importSpec       // imports declared directly in this scope
@@ -84,6 +88,7 @@ type Symbol struct {
 	successions []successionSpec   // succession edges declared in this action body
 	accepts     []acceptSpec       // accept statements declared in this action body
 	transitions []transitionSpec   // state transitions declared in this state def body
+	loops       []loopSpec         // loop repetitions declared in this action body
 	root        *Symbol
 }
 
@@ -187,6 +192,21 @@ type TransitionEdge struct {
 	EffectName string
 	Guard      string
 	Range      text.TextRange
+}
+
+// LoopStmt is a resolved `loop <count> times <activity>` repetition.
+type LoopStmt struct {
+	Count      string  // repeat count as written (int literal or param name)
+	Target     *Symbol // resolved repeated activity, or nil if unresolved
+	TargetName string  // the activity reference as written
+	Range      text.TextRange
+}
+
+// loopSpec is a loop captured at build time, before resolution.
+type loopSpec struct {
+	count  string
+	target []string
+	rng    text.TextRange
 }
 
 // transitionSpec is a state transition captured at build time, before resolution.

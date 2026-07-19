@@ -93,6 +93,8 @@ func (p *parser) parseMember() {
 		p.parsePackage()
 	case kw == "perform":
 		p.parsePerform()
+	case kw == "first" || kw == "then" || kw == "succession":
+		p.parseSuccession()
 	case isDeclKeyword(kw):
 		p.parseDeclaration()
 	default:
@@ -510,11 +512,38 @@ func (p *parser) atMemberStart() bool {
 	if p.current() == KindAt || p.current() == KindHash || p.atVisibility() {
 		return true
 	}
-	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") {
+	if p.atKeyword("import") || p.atKeyword("package") || p.atKeyword("perform") ||
+		p.atKeyword("first") || p.atKeyword("then") || p.atKeyword("succession") {
 		return true
 	}
 	t := p.sigTokenN(0)
 	return t.Kind == KindIdent && isDeclKeyword(t.Text)
+}
+
+// parseSuccession parses a control-flow succession edge, e.g.
+//
+//	first A then B;   then B;   succession first A then B;
+func (p *parser) parseSuccession() {
+	p.b.StartNode(KindSuccession.Raw())
+	if p.atKeyword("succession") {
+		p.bump()
+	}
+	if p.atKeyword("first") {
+		p.bump()
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName() // source
+		}
+	}
+	if p.atKeyword("then") {
+		p.bump()
+		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
+			p.parseQualifiedName() // target
+		}
+	}
+	if p.current() == KindSemicolon {
+		p.bump()
+	}
+	p.b.FinishNode()
 }
 
 // parsePerform parses a `perform` action reference, e.g.

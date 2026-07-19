@@ -94,6 +94,7 @@ const (
 	KindAnnotation   // @Name / #Name prefix annotation
 	KindMultiplicity // [ ... ] multiplicity after a type
 	KindPerform      // perform action reference
+	KindSuccession   // first A then B control edge
 )
 
 var kindNames = [...]string{
@@ -158,6 +159,7 @@ var kindNames = [...]string{
 	KindAnnotation:    "Annotation",
 	KindMultiplicity:  "Multiplicity",
 	KindPerform:       "Perform",
+	KindSuccession:    "Succession",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

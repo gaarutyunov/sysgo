@@ -88,6 +88,7 @@ func AnalyzeUnits(units []Unit) *Result {
 	m.buildSupertypes(root)
 	m.resolveRelationships(root, r)
 	m.resolvePerforms(root)
+	m.resolveSuccessions(root)
 	return r
 }
 
@@ -132,6 +133,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s.Annotations = annotationsOf(x)
 		s.Keywords = x.Keywords()
 		s.performs = performSpecsOf(x)
+		s.successions = successionSpecsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
@@ -178,6 +180,35 @@ func relSpecsOf(d ast.Declaration) []relSpec {
 		}
 	}
 	return out
+}
+
+// successionSpecsOf captures an action's succession edges before resolution.
+func successionSpecsOf(d ast.Declaration) []successionSpec {
+	var out []successionSpec
+	for _, su := range d.Successions() {
+		tgt, ok := su.Target()
+		if !ok {
+			continue
+		}
+		spec := successionSpec{target: segsOf(tgt), rng: su.Syntax().Range()}
+		if src, ok := su.Source(); ok {
+			spec.source = segsOf(src)
+		}
+		if len(spec.target) == 0 {
+			continue
+		}
+		out = append(out, spec)
+	}
+	return out
+}
+
+// segsOf returns a qualified name's segment texts.
+func segsOf(qn ast.QualifiedName) []string {
+	var segs []string
+	for _, seg := range qn.Names() {
+		segs = append(segs, seg.Text())
+	}
+	return segs
 }
 
 // performSpecsOf captures an action's `perform` statements before resolution.
@@ -388,6 +419,25 @@ func (m *Model) resolveRelationships(s *Symbol, r *Result) {
 	}
 	for _, child := range s.order {
 		m.resolveRelationships(child, r)
+	}
+}
+
+// resolveSuccessions resolves each action's succession source/target references.
+func (m *Model) resolveSuccessions(s *Symbol) {
+	for _, su := range s.successions {
+		edge := SuccessionEdge{
+			Target:     m.Resolve(s, su.target),
+			TargetName: joinSegs(su.target),
+			Range:      su.rng,
+		}
+		if su.source != nil {
+			edge.Source = m.Resolve(s, su.source)
+			edge.SourceName = joinSegs(su.source)
+		}
+		s.Successions = append(s.Successions, edge)
+	}
+	for _, child := range s.order {
+		m.resolveSuccessions(child)
 	}
 }
 

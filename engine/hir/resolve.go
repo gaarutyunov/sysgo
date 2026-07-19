@@ -87,6 +87,7 @@ func AnalyzeUnits(units []Unit) *Result {
 	m := r.Model
 	m.buildSupertypes(root)
 	m.resolveRelationships(root, r)
+	m.resolvePerforms(root)
 	return r
 }
 
@@ -130,6 +131,7 @@ func buildMember(parent *Symbol, m ast.Member) {
 		s.rels = relSpecsOf(x)
 		s.Annotations = annotationsOf(x)
 		s.Keywords = x.Keywords()
+		s.performs = performSpecsOf(x)
 		for _, cm := range x.Members() {
 			buildMember(s, cm)
 		}
@@ -174,6 +176,26 @@ func relSpecsOf(d ast.Declaration) []relSpec {
 			}
 			out = append(out, relSpec{kind: kind, target: segs, rng: rel.Syntax().Range()})
 		}
+	}
+	return out
+}
+
+// performSpecsOf captures an action's `perform` statements before resolution.
+func performSpecsOf(d ast.Declaration) []performSpec {
+	var out []performSpec
+	for _, pf := range d.Performs() {
+		tgt, ok := pf.Target()
+		if !ok {
+			continue
+		}
+		var segs []string
+		for _, seg := range tgt.Names() {
+			segs = append(segs, seg.Text())
+		}
+		if len(segs) == 0 {
+			continue
+		}
+		out = append(out, performSpec{name: pf.Name(), target: segs, rng: pf.Syntax().Range()})
 	}
 	return out
 }
@@ -366,6 +388,22 @@ func (m *Model) resolveRelationships(s *Symbol, r *Result) {
 	}
 	for _, child := range s.order {
 		m.resolveRelationships(child, r)
+	}
+}
+
+// resolvePerforms resolves each action's `perform` target references to symbols.
+func (m *Model) resolvePerforms(s *Symbol) {
+	for _, pf := range s.performs {
+		target := m.Resolve(s, pf.target)
+		s.Performs = append(s.Performs, PerformStep{
+			Name:   pf.name,
+			Target: target,
+			Name0:  joinSegs(pf.target),
+			Range:  pf.rng,
+		})
+	}
+	for _, child := range s.order {
+		m.resolvePerforms(child)
 	}
 }
 

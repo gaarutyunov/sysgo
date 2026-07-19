@@ -57,11 +57,16 @@ type Symbol struct {
 	// keyword, and optional "def"), used to expose direction and kind.
 	Keywords []string
 
-	members map[string]*Symbol // local name → child (first wins on collision)
-	order   []*Symbol          // children in declaration order
-	imports []importSpec       // imports declared directly in this scope
-	rels    []relSpec          // relationship clauses declared on this symbol
-	root    *Symbol
+	// Performs holds the resolved `perform` action references in this action's
+	// body, in declaration order.
+	Performs []PerformStep
+
+	members  map[string]*Symbol // local name → child (first wins on collision)
+	order    []*Symbol          // children in declaration order
+	imports  []importSpec       // imports declared directly in this scope
+	rels     []relSpec          // relationship clauses declared on this symbol
+	performs []performSpec      // perform statements declared in this action body
+	root     *Symbol
 }
 
 // RelKind classifies a KerML relationship clause.
@@ -112,6 +117,22 @@ type Annotation struct {
 func (a Annotation) Value(key string) (string, bool) {
 	v, ok := a.Values[key]
 	return v, ok
+}
+
+// PerformStep is a resolved `perform` action reference: its step name (if any)
+// and the target action it performs.
+type PerformStep struct {
+	Name   string  // local step name, or "" for a direct reference
+	Target *Symbol // resolved target action, or nil if unresolved
+	Name0  string  // the referenced target name as written
+	Range  text.TextRange
+}
+
+// performSpec is a perform statement captured at build time, before resolution.
+type performSpec struct {
+	name   string
+	target []string
+	rng    text.TextRange
 }
 
 // relSpec is a relationship clause captured at build time, before resolution.

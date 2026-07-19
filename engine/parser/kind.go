@@ -93,6 +93,7 @@ const (
 	KindUsage        // <kind> name ... or directed/bare usage
 	KindAnnotation   // @Name / #Name prefix annotation
 	KindMultiplicity // [ ... ] multiplicity after a type
+	KindPerform      // perform action reference
 )
 
 var kindNames = [...]string{
@@ -156,6 +157,7 @@ var kindNames = [...]string{
 	KindUsage:         "Usage",
 	KindAnnotation:    "Annotation",
 	KindMultiplicity:  "Multiplicity",
+	KindPerform:       "Perform",
 }
 
 // String returns the kind's name, or "SyntaxKind(N)" for an unknown value.

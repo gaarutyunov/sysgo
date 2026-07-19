@@ -656,6 +656,7 @@ func (p *parser) parseControlNode() {
 // parseSuccession parses a control-flow succession edge, e.g.
 //
 //	first A then B;   then B;   succession first A then B;
+//	first A if guard then B;   (guarded succession)
 func (p *parser) parseSuccession() {
 	p.b.StartNode(KindSuccession.Raw())
 	if p.atKeyword("succession") {
@@ -667,6 +668,10 @@ func (p *parser) parseSuccession() {
 			p.parseQualifiedName() // source
 		}
 	}
+	if p.atKeyword("if") {
+		p.bump()
+		p.parseSuccessionGuard()
+	}
 	if p.atKeyword("then") {
 		p.bump()
 		if c := p.current(); c == KindIdent || c == KindQuotedIdent {
@@ -677,6 +682,24 @@ func (p *parser) parseSuccession() {
 		p.bump()
 	}
 	p.b.FinishNode()
+}
+
+// parseSuccessionGuard wraps the guard condition — every token between `if` and
+// the following `then`/`;`/`}` — in an Expr node.
+func (p *parser) parseSuccessionGuard() {
+	p.b.StartNode(KindExpr.Raw())
+	for {
+		switch c := p.current(); {
+		case c == KindEOF || c == KindRBrace || c == KindSemicolon:
+			p.b.FinishNode()
+			return
+		case p.atKeyword("then"):
+			p.b.FinishNode()
+			return
+		default:
+			p.bump()
+		}
+	}
 }
 
 // parsePerform parses a `perform` action reference, e.g.

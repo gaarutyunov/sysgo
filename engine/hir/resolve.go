@@ -252,6 +252,9 @@ func successionSpecsOf(d ast.Declaration) []successionSpec {
 		if src, ok := su.Source(); ok {
 			spec.source = segsOf(src)
 		}
+		if g, ok := su.Guard(); ok {
+			spec.guard = g
+		}
 		if len(spec.target) == 0 {
 			continue
 		}
@@ -532,6 +535,7 @@ func (m *Model) resolveSuccessions(s *Symbol) {
 		edge := SuccessionEdge{
 			Target:     m.Resolve(s, su.target),
 			TargetName: joinSegs(su.target),
+			Guard:      su.guard,
 			Range:      su.rng,
 		}
 		if su.source != nil {

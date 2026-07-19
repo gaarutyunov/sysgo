@@ -38,6 +38,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 	for _, wf := range wfs {
 		params, steps := splitParamsAndSteps(wf.Element)
 		timers := timerAccepts(wf.Element)
+		guards := guardByStep(wf.Element)
 		f.Func().Id(exported(wf.Name()) + "Workflow").ParamsFunc(func(p *jen.Group) {
 			p.Id("ctx").Qual(sdkWorkflow, "Context")
 			for _, param := range params {
@@ -69,7 +70,7 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 					continue
 				}
 				step := it.step
-				g.If(
+				exec := jen.If(
 					jen.Err().Op(":=").Qual(sdkWorkflow, "ExecuteActivity").CallFunc(func(c *jen.Group) {
 						c.Id("ctx")
 						c.Lit(exported(step.activity.Name()))
@@ -81,6 +82,12 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 				).Block(
 					jen.Return(jen.Err()),
 				)
+				// A guarded succession targeting this step runs it conditionally.
+				if guard := guards[stepName(step)]; guard != "" {
+					g.If(jen.Id(guard)).Block(exec)
+				} else {
+					g.Add(exec)
+				}
 			}
 			g.Return(jen.Nil())
 		})
@@ -91,6 +98,27 @@ func GenerateWorkflows(m *engine.Model, packageName string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// guardByStep maps a workflow's guarded-succession target name to its guard
+// condition, so the target activity can be emitted conditionally.
+func guardByStep(wf engine.Element) map[string]string {
+	out := map[string]string{}
+	for _, su := range wf.Successions() {
+		if su.Guard != "" && su.TargetName != "" {
+			out[su.TargetName] = su.Guard
+		}
+	}
+	return out
+}
+
+// stepName returns an activity step's usage name (e.g. "b" for `action b : B`),
+// or "" for a perform-based step.
+func stepName(st *step) string {
+	if st.usage.IsValid() {
+		return st.usage.Name()
+	}
+	return ""
 }
 
 // bodyItem is one ordered element of a workflow body: an activity step or a

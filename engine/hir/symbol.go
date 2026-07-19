@@ -152,6 +152,7 @@ type SuccessionEdge struct {
 	Target     *Symbol
 	SourceName string
 	TargetName string
+	Guard      string
 	Range      text.TextRange
 }
 
@@ -204,6 +205,7 @@ type transitionSpec struct {
 type successionSpec struct {
 	source []string
 	target []string
+	guard  string
 	rng    text.TextRange
 }
 

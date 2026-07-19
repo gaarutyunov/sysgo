@@ -6,6 +6,7 @@ import "github.com/gaarutyunov/sysgo/engine/hir"
 type Succession struct {
 	SourceName string // source reference as written, or "" for a bare `then`
 	TargetName string // target reference as written
+	Guard      string // `if` condition text, or "" for an unguarded edge
 
 	source *hir.Symbol
 	target *hir.Symbol
@@ -37,6 +38,7 @@ func (e Element) Successions() []Succession {
 		out[i] = Succession{
 			SourceName: se.SourceName,
 			TargetName: se.TargetName,
+			Guard:      se.Guard,
 			source:     se.Source,
 			target:     se.Target,
 			model:      e.model,

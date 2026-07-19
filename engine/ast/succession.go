@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"strings"
+
 	"github.com/gaarutyunov/sysgo/engine/cst"
 	"github.com/gaarutyunov/sysgo/engine/parser"
 )
@@ -48,6 +50,14 @@ func (s Succession) Target() (QualifiedName, bool) {
 		return QualifiedName{}, false
 	}
 	return qns[len(qns)-1], true
+}
+
+// Guard returns the succession's `if` condition text, if present.
+func (s Succession) Guard() (string, bool) {
+	if e, ok := firstChildOfKind(s.node, parser.KindExpr); ok {
+		return strings.TrimSpace(Expr{e}.Text()), true
+	}
+	return "", false
 }
 
 // Successions returns the declaration body's succession edges in order.

@@ -13,7 +13,7 @@ This example combines all three sysgo generators over a single bounded context
 |---|---|---|
 | `internal/order/domain`, `internal/order/app` | the **DDD core** — domain, ports, and the `PlaceOrder` use case | `sysgo generate` (from `model.json`) |
 | `cmd/api` | REST entrypoint whose handlers call the `PlaceOrder` use case | `sysgo gen openapi` + oapi-codegen |
-| `cmd/worker` *(follow-up)* | Temporal worker whose activities call the use case | `sysgo gen temporal` |
+| `cmd/worker` | Temporal worker whose activities call the `PlaceOrder` use case | `sysgo gen temporal` |
 
 ## Model
 
@@ -26,6 +26,7 @@ DDD structure), which keeps the DDD path free of the SysML-to-JSON toolchain.
 ## Regenerate
 
 ```bash
-go generate ./...   # regenerates the DDD core (sysgo generate), the OpenAPI doc
-                    # (sysgo gen openapi) and the gin server (oapi-codegen)
+go generate ./...   # regenerates the DDD core (sysgo generate), the OpenAPI doc +
+                    # gin server (sysgo gen openapi + oapi-codegen) and the
+                    # Temporal worker code (sysgo gen temporal)
 ```

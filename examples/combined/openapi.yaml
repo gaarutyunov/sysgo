@@ -1,0 +1,535 @@
+openapi: 3.1.0
+info:
+  title: API
+  version: 1.0.0
+paths:
+  /orders:
+    post:
+      operationId: PlaceOrderAPI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderContext.Order'
+      responses:
+        "201":
+          description: PlaceOrderAPI succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderContext.Order'
+        default:
+          description: error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    OrderContext.ChargeCard:
+      type: object
+      properties:
+        order:
+          type: object
+          properties:
+            id:
+              type: string
+            lines:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                sku:
+                  type: string
+              required:
+                - qty
+                - sku
+            pay:
+              type: object
+              properties:
+                charge:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                  required:
+                    - amount
+                receipt:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                  required:
+                    - id
+              required:
+                - charge
+                - receipt
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+              required:
+                - amount
+                - currency
+          required:
+            - id
+            - lines
+            - pay
+            - total
+      required:
+        - order
+    OrderContext.ChargeRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+      required:
+        - amount
+    OrderContext.LineItem:
+      type: object
+      properties:
+        qty:
+          type: integer
+        sku:
+          type: string
+      required:
+        - qty
+        - sku
+    OrderContext.Money:
+      type: object
+      properties:
+        amount:
+          type: number
+        currency:
+          type: string
+      required:
+        - amount
+        - currency
+    OrderContext.Order:
+      type: object
+      properties:
+        id:
+          type: string
+        lines:
+          type: object
+          properties:
+            qty:
+              type: integer
+            sku:
+              type: string
+          required:
+            - qty
+            - sku
+        pay:
+          type: object
+          properties:
+            charge:
+              type: object
+              properties:
+                amount:
+                  type: number
+              required:
+                - amount
+            receipt:
+              type: object
+              properties:
+                id:
+                  type: string
+              required:
+                - id
+          required:
+            - charge
+            - receipt
+        total:
+          type: object
+          properties:
+            amount:
+              type: number
+            currency:
+              type: string
+          required:
+            - amount
+            - currency
+      required:
+        - id
+        - lines
+        - pay
+        - total
+    OrderContext.OrderRepository:
+      type: object
+      properties:
+        order:
+          type: object
+          properties:
+            id:
+              type: string
+            lines:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                sku:
+                  type: string
+              required:
+                - qty
+                - sku
+            pay:
+              type: object
+              properties:
+                charge:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                  required:
+                    - amount
+                receipt:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                  required:
+                    - id
+              required:
+                - charge
+                - receipt
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+              required:
+                - amount
+                - currency
+          required:
+            - id
+            - lines
+            - pay
+            - total
+      required:
+        - order
+    OrderContext.PaymentPort:
+      type: object
+      properties:
+        charge:
+          type: object
+          properties:
+            amount:
+              type: number
+          required:
+            - amount
+        receipt:
+          type: object
+          properties:
+            id:
+              type: string
+          required:
+            - id
+      required:
+        - charge
+        - receipt
+    OrderContext.PlaceOrder:
+      type: object
+      properties:
+        order:
+          type: object
+          properties:
+            id:
+              type: string
+            lines:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                sku:
+                  type: string
+              required:
+                - qty
+                - sku
+            pay:
+              type: object
+              properties:
+                charge:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                  required:
+                    - amount
+                receipt:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                  required:
+                    - id
+              required:
+                - charge
+                - receipt
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+              required:
+                - amount
+                - currency
+          required:
+            - id
+            - lines
+            - pay
+            - total
+      required:
+        - order
+    OrderContext.ProcessOrder:
+      type: object
+      properties:
+        charge:
+          type: object
+          properties:
+            order:
+              type: object
+              properties:
+                id:
+                  type: string
+                lines:
+                  type: object
+                  properties:
+                    qty:
+                      type: integer
+                    sku:
+                      type: string
+                  required:
+                    - qty
+                    - sku
+                pay:
+                  type: object
+                  properties:
+                    charge:
+                      type: object
+                      properties:
+                        amount:
+                          type: number
+                      required:
+                        - amount
+                    receipt:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                      required:
+                        - id
+                  required:
+                    - charge
+                    - receipt
+                total:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                    currency:
+                      type: string
+                  required:
+                    - amount
+                    - currency
+              required:
+                - id
+                - lines
+                - pay
+                - total
+          required:
+            - order
+        notify:
+          type: object
+          properties:
+            order:
+              type: object
+              properties:
+                id:
+                  type: string
+                lines:
+                  type: object
+                  properties:
+                    qty:
+                      type: integer
+                    sku:
+                      type: string
+                  required:
+                    - qty
+                    - sku
+                pay:
+                  type: object
+                  properties:
+                    charge:
+                      type: object
+                      properties:
+                        amount:
+                          type: number
+                      required:
+                        - amount
+                    receipt:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                      required:
+                        - id
+                  required:
+                    - charge
+                    - receipt
+                total:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                    currency:
+                      type: string
+                  required:
+                    - amount
+                    - currency
+              required:
+                - id
+                - lines
+                - pay
+                - total
+          required:
+            - order
+        order:
+          type: object
+          properties:
+            id:
+              type: string
+            lines:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                sku:
+                  type: string
+              required:
+                - qty
+                - sku
+            pay:
+              type: object
+              properties:
+                charge:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                  required:
+                    - amount
+                receipt:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                  required:
+                    - id
+              required:
+                - charge
+                - receipt
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+              required:
+                - amount
+                - currency
+          required:
+            - id
+            - lines
+            - pay
+            - total
+      required:
+        - charge
+        - notify
+        - order
+    OrderContext.Receipt:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+    OrderContext.SendReceipt:
+      type: object
+      properties:
+        order:
+          type: object
+          properties:
+            id:
+              type: string
+            lines:
+              type: object
+              properties:
+                qty:
+                  type: integer
+                sku:
+                  type: string
+              required:
+                - qty
+                - sku
+            pay:
+              type: object
+              properties:
+                charge:
+                  type: object
+                  properties:
+                    amount:
+                      type: number
+                  required:
+                    - amount
+                receipt:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                  required:
+                    - id
+              required:
+                - charge
+                - receipt
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+              required:
+                - amount
+                - currency
+          required:
+            - id
+            - lines
+            - pay
+            - total
+      required:
+        - order
+    ProblemDetails:
+      type: object
+      properties:
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        status:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+          format: uri

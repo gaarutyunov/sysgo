@@ -11,12 +11,13 @@ generate:
   domain: true
   usecases: true
   ports: true
-  adapters: off       # the OpenAPI/Temporal entrypoints are the driving adapters
+  adapters: scaffold  # render the driving-adapter layer: REST & Temporal transports
+                      # are driving adapters (adapter/in/*) over the same use cases
   events: true
   tests: false
   importlint: true
   cmd:
-    mode: off         # entrypoints (openapi/temporal) provide the mains
+    mode: off         # cmd/api + cmd/worker are hand-written composition roots
 
 ports:
   driven-dir: app/port/out

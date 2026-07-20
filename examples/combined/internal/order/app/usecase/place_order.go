@@ -6,25 +6,32 @@ import (
 	"errors"
 
 	"github.com/gaarutyunov/sysgo/examples/combined/internal/order/app/port/in"
+	"github.com/gaarutyunov/sysgo/examples/combined/internal/order/app/port/out"
 )
 
-// PlaceOrderInteractor implements the PlaceOrder use case — the shared business
-// logic that both the OpenAPI and Temporal entrypoints drive.
-type PlaceOrderInteractor struct{}
+// PlaceOrderInteractor implements the PlaceOrder use case — the single piece of
+// business logic that both the REST and Temporal driving adapters invoke. It
+// depends only on ports (here the OrderRepository driven port), never on any
+// transport.
+type PlaceOrderInteractor struct {
+	orders out.OrderRepository
+}
 
 var _ in.PlaceOrderUseCase = (*PlaceOrderInteractor)(nil)
 
-// NewPlaceOrderInteractor constructs the interactor. Inject driven ports here.
-func NewPlaceOrderInteractor() *PlaceOrderInteractor {
-	return &PlaceOrderInteractor{}
+// NewPlaceOrderInteractor injects the driven OrderRepository port.
+func NewPlaceOrderInteractor(orders out.OrderRepository) *PlaceOrderInteractor {
+	return &PlaceOrderInteractor{orders: orders}
 }
 
-// PlaceOrder accepts an order. This example keeps the logic trivial — it
-// validates the order carries an id — to demonstrate the transport → use-case
-// flow; a real interactor would orchestrate the domain and driven ports.
+// PlaceOrder validates and persists the order. The same code runs whether the
+// caller arrived over HTTP or Temporal.
 func (p *PlaceOrderInteractor) PlaceOrder(input in.PlaceOrderInput) (in.PlaceOrderOutput, error) {
 	if input.Order.ID == "" {
 		return in.PlaceOrderOutput{}, errors.New("order id is required")
+	}
+	if err := p.orders.OrderRepository(input.Order); err != nil {
+		return in.PlaceOrderOutput{}, err
 	}
 	return in.PlaceOrderOutput{}, nil
 }

@@ -18,10 +18,16 @@ type Config struct {
 	OutputOptions     OutputOptions      `yaml:"output-options"`
 }
 
-// Source selects the model ingestion mode. API and File are mutually exclusive.
+// Source selects the model ingestion mode. API and File are mutually exclusive
+// and feed the DDD pipeline (SysML v2 API JSON → internal/core). SysML is an
+// independent, additive source: the path to the SysML v2 *textual* notation,
+// consumed by the engine to drive the gen/* contract generators (OVERVIEW.md
+// F4). It is only required when a contract generator (e.g. generate.openapi) is
+// enabled.
 type Source struct {
-	API  *APISource `yaml:"api,omitempty"`
-	File string     `yaml:"file,omitempty"`
+	API   *APISource `yaml:"api,omitempty"`
+	File  string     `yaml:"file,omitempty"`
+	SysML string     `yaml:"sysml,omitempty"`
 }
 
 // APISource points sysgo at a SysML v2 API Services endpoint.
@@ -47,6 +53,9 @@ type Generate struct {
 	ImportLint bool   `yaml:"importlint"`
 	DI         DI     `yaml:"di"`
 	Cmd        Cmd    `yaml:"cmd"`
+	// OpenAPI enables the OpenAPI 3.1 contract generator (emits openapi.yaml
+	// from source.sysml via the engine + gen/contracts). Default off.
+	OpenAPI bool `yaml:"openapi"`
 }
 
 // DI controls dependency-injection wiring. When enabled, sysgo emits a

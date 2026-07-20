@@ -145,9 +145,9 @@ generate:
 | Section | Purpose |
 |---|---|
 | `module` | Go module path |
-| `source` | `api` (base-url/project/commit) **or** `file` |
+| `source` | `api` (base-url/project/commit) **or** `file`; optional `sysml` (path to `.sysml` textual source for contract generators) |
 | `overlay.path` | overlay document applied before IR build |
-| `generate.*` | which artifacts to emit (`adapters: off\|scaffold\|full`, `di.enabled`, `cmd.mode: per-context\|mono\|custom\|off`) |
+| `generate.*` | which artifacts to emit (`adapters: off\|scaffold\|full`, `di.enabled`, `cmd.mode: per-context\|mono\|custom\|off`, `openapi`) |
 | `ports.*` | port directories; `repository-in-domain` |
 | `layout.*` | region → directory + package (`{context}` interpolated) |
 | `type-mapping` / `import-mapping` / `additional-imports` | Go type/import control |

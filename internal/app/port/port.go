@@ -56,3 +56,12 @@ type WriteResult struct {
 type Builder interface {
 	Build(g *model.Graph) (*ir.Project, error)
 }
+
+// ContractEmitter emits API contract artifacts (e.g. openapi.yaml) as
+// additional output files. Unlike the DDD stages (which consume the
+// internal/core IR), contract emitters consume the engine's resolved model
+// directly (OVERVIEW.md F4); the pipeline treats their output as extra files to
+// write through the same FileWriter policy.
+type ContractEmitter interface {
+	Emit(ctx context.Context) ([]File, error)
+}

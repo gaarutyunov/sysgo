@@ -21,7 +21,8 @@
             "commit": { "type": "string" }
           }
         },
-        "file": { "type": "string" }
+        "file": { "type": "string" },
+        "sysml": { "type": "string" }
       }
     },
     "overlay": {
@@ -40,6 +41,7 @@
         "events": { "type": "boolean" },
         "tests": { "type": "boolean" },
         "importlint": { "type": "boolean" },
+        "openapi": { "type": "boolean" },
         "di": {
           "type": "object",
           "additionalProperties": false,

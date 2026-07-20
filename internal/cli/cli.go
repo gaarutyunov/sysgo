@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gaarutyunov/sysgo/internal/adapter/gotmpl"
+	"github.com/gaarutyunov/sysgo/internal/adapter/openapi"
 	"github.com/gaarutyunov/sysgo/internal/adapter/osfs"
 	"github.com/gaarutyunov/sysgo/internal/adapter/overlay"
 	"github.com/gaarutyunov/sysgo/internal/adapter/sysmlapi"
@@ -86,6 +87,7 @@ func loadConfig(gf *globalFlags) (*config.Config, error) {
 	// Resolve model/overlay paths relative to the config file's directory.
 	base := filepath.Dir(gf.configPath)
 	cfg.Source.File = resolveRel(base, cfg.Source.File)
+	cfg.Source.SysML = resolveRel(base, cfg.Source.SysML)
 	cfg.Overlay.Path = resolveRel(base, cfg.Overlay.Path)
 
 	if gf.module != "" {
@@ -145,12 +147,22 @@ func buildPipeline(cfg *config.Config) (*app.Pipeline, *mapping.Mapper, error) {
 		return nil, nil, err
 	}
 	writer := osfs.New(cfg.OutputOptions.SkipFmt, cfg.OutputOptions.SkipPrune, cfg.OutputOptions.GeneratedMarker)
+
+	var contractsEmitter port.ContractEmitter
+	if cfg.Generate.OpenAPI {
+		if cfg.Source.SysML == "" {
+			return nil, nil, fmt.Errorf("generate.openapi requires source.sysml (path to the .sysml textual source)")
+		}
+		contractsEmitter = openapi.New(cfg.Source.SysML)
+	}
+
 	return &app.Pipeline{
-		Loader:   loader,
-		Overlay:  ov,
-		Builder:  mapper,
-		Renderer: renderer,
-		Writer:   writer,
+		Loader:    loader,
+		Overlay:   ov,
+		Builder:   mapper,
+		Renderer:  renderer,
+		Writer:    writer,
+		Contracts: contractsEmitter,
 	}, mapper, nil
 }
 

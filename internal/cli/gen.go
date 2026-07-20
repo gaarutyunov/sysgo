@@ -27,22 +27,32 @@ func newGenCmd() *cobra.Command {
 }
 
 func newGenOpenAPICmd() *cobra.Command {
-	var out string
+	var out, pkg string
+	var server, models bool
 	cmd := &cobra.Command{
 		Use:   "openapi <model.sysml>",
-		Short: "Generate an OpenAPI 3.1 document from a SysML model",
-		Args:  cobra.ExactArgs(1),
+		Short: "Generate an OpenAPI 3.1 server or document from a SysML model",
+		Long: "Generate from a SysML model, in-process:\n" +
+			"  --server   the gin server + models Go code (oapi-codegen, built from an\n" +
+			"             in-memory openapi3.T \u2014 no openapi.yaml to keep in sync)\n" +
+			"  --models   only the model types Go code\n" +
+			"  (default)  the OpenAPI 3.1 document, emitted for reference (swagger/redocly)",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runGenOpenAPI(cmd, args[0], out)
+			return runGenOpenAPI(cmd, args[0], out, pkg, server, models)
 		},
 	}
-	cmd.Flags().StringVar(&out, "out", "openapi.yaml", "output OpenAPI document path")
+	cmd.Flags().StringVar(&out, "out", "openapi.yaml", "output path (a .go file for --server/--models; otherwise the OpenAPI document)")
+	cmd.Flags().StringVar(&pkg, "package", "api", "Go package name for --server/--models")
+	cmd.Flags().BoolVar(&server, "server", false, "generate the gin server + models Go code directly (no YAML file)")
+	cmd.Flags().BoolVar(&models, "models", false, "generate only the model types Go code")
+	cmd.MarkFlagsMutuallyExclusive("server", "models")
 	return cmd
 }
 
 // runGenOpenAPI loads the model and writes the OpenAPI document deterministically,
 // so the same command drives both the example scaffolding and the drift check.
-func runGenOpenAPI(cmd *cobra.Command, modelPath, out string) error {
+func runGenOpenAPI(cmd *cobra.Command, modelPath, out, pkg string, server, models bool) error {
 	src, err := os.ReadFile(modelPath)
 	if err != nil {
 		return err
@@ -57,17 +67,36 @@ func runGenOpenAPI(cmd *cobra.Command, modelPath, out string) error {
 		return fmt.Errorf("%s", b.String())
 	}
 
-	doc := contracts.BuildDocument(m)
+	var content, summary string
+	switch {
+	case server:
+		code, err := contracts.GenerateServer(m, pkg)
+		if err != nil {
+			return err
+		}
+		content, summary = code, fmt.Sprintf("gin server + models (package %s)", pkg)
+	case models:
+		code, err := contracts.GenerateModels(m, pkg)
+		if err != nil {
+			return err
+		}
+		content, summary = code, fmt.Sprintf("model types (package %s)", pkg)
+	default:
+		doc := contracts.BuildDocument(m)
+		content = doc.YAML()
+		summary = fmt.Sprintf("OpenAPI document (%d schema(s))", len(doc.SchemaNames()))
+	}
+
 	if dir := filepath.Dir(out); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
 	}
-	if err := os.WriteFile(out, []byte(doc.YAML()), 0o644); err != nil {
+	if err := os.WriteFile(out, []byte(content), 0o644); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "sysgo: wrote OpenAPI document to %s (%d schema(s))\n", out, len(doc.SchemaNames()))
+	fmt.Fprintf(cmd.OutOrStdout(), "sysgo: wrote %s to %s\n", summary, out)
 	return nil
 }
 

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/gaarutyunov/sysgo/main/schema/sysgo.schema.json
+module: github.com/gaarutyunov/sysgo/examples/combined
+
+source:
+  # The DDD core is generated from the SysML v2 API JSON. model.json is the Order
+  # bounded context (shared with examples/order); model.sysml is the same domain
+  # plus the @REST and Temporal annotations that drive the entrypoint generators.
+  file: ./model.json
+
+generate:
+  domain: true
+  usecases: true
+  ports: true
+  adapters: off       # the OpenAPI/Temporal entrypoints are the driving adapters
+  events: true
+  tests: false
+  importlint: true
+  cmd:
+    mode: off         # entrypoints (openapi/temporal) provide the mains
+
+ports:
+  driven-dir: app/port/out
+  driving-dir: app/port/in
+  repository-in-domain: false

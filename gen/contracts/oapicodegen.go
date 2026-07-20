@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -58,15 +59,17 @@ func GenerateFromConfig(m *engine.Model, cfg codegen.Configuration) (string, err
 	return generate(BuildDocument(m), cfg)
 }
 
-// generate loads the document as an OpenAPI 3.1 spec, validates it, and invokes
+// generate builds the OpenAPI 3.1 spec directly as kin-openapi structs (no YAML
+// round-trip), resolves its internal $refs in-memory, validates it, and invokes
 // oapi-codegen with cfg.
 func generate(doc *Document, cfg codegen.Configuration) (string, error) {
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromData([]byte(doc.YAML()))
-	if err != nil {
-		return "", fmt.Errorf("load openapi spec: %w", err)
+	spec := doc.ToOpenAPI3()
+	// Resolve internal $refs in place so the in-memory spec is self-contained
+	// before validation and code generation — no serialize/parse round-trip.
+	if err := openapi3.NewLoader().ResolveRefsIn(spec, nil); err != nil {
+		return "", fmt.Errorf("resolve openapi refs: %w", err)
 	}
-	if err := spec.Validate(loader.Context); err != nil {
+	if err := spec.Validate(context.Background()); err != nil {
 		return "", fmt.Errorf("validate openapi spec: %w", err)
 	}
 	cfg = cfg.UpdateDefaults()

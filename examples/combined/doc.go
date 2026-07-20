@@ -14,4 +14,5 @@
 //go:generate go tool sysgo generate -c sysgo.yaml --out .
 //go:generate go tool sysgo gen openapi model.sysml --out openapi.yaml
 //go:generate go tool oapi-codegen -config oapi-codegen.yaml openapi.yaml
+//go:generate go tool sysgo gen temporal model.sysml --out orders --package orders
 package combined

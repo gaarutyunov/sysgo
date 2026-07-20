@@ -274,12 +274,12 @@ jobs:
       - name: Test the combined example
         working-directory: examples/combined
         run: go test ./...
-      - name: Regenerate the DDD core, OpenAPI doc and server from the model
+      - name: Regenerate the DDD core, OpenAPI and Temporal code from the model
         working-directory: examples/combined
         run: go generate ./...
       - name: Assert committed generated code is sysgo/oapi-codegen output (no drift)
         run: |
-          paths="examples/combined/internal examples/combined/openapi.yaml examples/combined/api"
+          paths="examples/combined/internal examples/combined/openapi.yaml examples/combined/api examples/combined/orders"
           if [ -n "$(git status --porcelain -- $paths)" ]; then
             echo "::error::examples/combined generated code is out of sync with the model."
             echo "Regenerate with 'go generate ./...' in examples/combined and commit the result."

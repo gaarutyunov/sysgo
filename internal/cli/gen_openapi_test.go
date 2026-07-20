@@ -89,3 +89,69 @@ func TestGenOpenAPIDiagnostics(t *testing.T) {
 		t.Error("expected an error for a model with diagnostics, got nil")
 	}
 }
+
+const genOpenAPIRESTModel = `package Catalog {
+	import ScalarValues::*;
+	import RESTProfile::*;
+	item def Product {
+		attribute id : String;
+		attribute name : String;
+	}
+	@REST { path = "/products"; method = "POST"; successStatus = 201; }
+	action def CreateProduct {
+		in product : Product;
+		out created : Product;
+	}
+}`
+
+// TestGenOpenAPIServer generates the gin server Go code directly from the model
+// (no openapi.yaml intermediate) and checks the server surface is present.
+func TestGenOpenAPIServer(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "catalog.sysml")
+	if err := os.WriteFile(model, []byte(genOpenAPIRESTModel), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "server.gen.go")
+	if _, err := runGen(t, "gen", "openapi", model, "--server", "--out", out, "--package", "api"); err != nil {
+		t.Fatalf("gen openapi --server: %v", err)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read generated server: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{"package api", "ServerInterface", "RegisterHandlers"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("generated server missing %q", want)
+		}
+	}
+	// The server mode must not leave a stale openapi.yaml lying around.
+	if _, err := os.Stat(filepath.Join(dir, "openapi.yaml")); !os.IsNotExist(err) {
+		t.Errorf("--server should not write openapi.yaml (stat err = %v)", err)
+	}
+}
+
+// TestGenOpenAPIModels generates only the model types.
+func TestGenOpenAPIModels(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "catalog.sysml")
+	if err := os.WriteFile(model, []byte(genOpenAPIRESTModel), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "models.gen.go")
+	if _, err := runGen(t, "gen", "openapi", model, "--models", "--out", out, "--package", "api"); err != nil {
+		t.Fatalf("gen openapi --models: %v", err)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "package api") {
+		t.Errorf("generated models missing package declaration:\n%s", got)
+	}
+	if strings.Contains(got, "ServerInterface") {
+		t.Errorf("--models should not emit the server interface")
+	}
+}

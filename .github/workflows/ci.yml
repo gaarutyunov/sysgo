@@ -271,16 +271,20 @@ jobs:
       - name: Build the combined example
         working-directory: examples/combined
         run: go build ./...
-      - name: Regenerate the DDD core from the model
+      - name: Test the combined example
+        working-directory: examples/combined
+        run: go test ./...
+      - name: Regenerate the DDD core, OpenAPI doc and server from the model
         working-directory: examples/combined
         run: go generate ./...
-      - name: Assert committed DDD core is sysgo output (no drift)
+      - name: Assert committed generated code is sysgo/oapi-codegen output (no drift)
         run: |
-          if [ -n "$(git status --porcelain -- examples/combined/internal)" ]; then
-            echo "::error::examples/combined/internal is out of sync with 'sysgo generate'."
+          paths="examples/combined/internal examples/combined/openapi.yaml examples/combined/api"
+          if [ -n "$(git status --porcelain -- $paths)" ]; then
+            echo "::error::examples/combined generated code is out of sync with the model."
             echo "Regenerate with 'go generate ./...' in examples/combined and commit the result."
-            git status --porcelain -- examples/combined/internal
-            git diff -- examples/combined/internal
+            git status --porcelain -- $paths
+            git diff -- $paths
             exit 1
           fi
-          echo "No drift: committed DDD core matches sysgo output."
+          echo "No drift: committed DDD core, openapi.yaml and api/ match generator output."

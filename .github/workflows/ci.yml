@@ -255,3 +255,32 @@ jobs:
             exit 1
           fi
           echo "No drift: committed openapi.yaml and api/ match sysgo + oapi-codegen output."
+
+  examples-combined:
+    name: Examples Combined (build + drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: examples/combined/go.sum
+      - name: Build the combined example
+        working-directory: examples/combined
+        run: go build ./...
+      - name: Regenerate the DDD core from the model
+        working-directory: examples/combined
+        run: go generate ./...
+      - name: Assert committed DDD core is sysgo output (no drift)
+        run: |
+          if [ -n "$(git status --porcelain -- examples/combined/internal)" ]; then
+            echo "::error::examples/combined/internal is out of sync with 'sysgo generate'."
+            echo "Regenerate with 'go generate ./...' in examples/combined and commit the result."
+            git status --porcelain -- examples/combined/internal
+            git diff -- examples/combined/internal
+            exit 1
+          fi
+          echo "No drift: committed DDD core matches sysgo output."

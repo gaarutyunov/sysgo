@@ -1,13 +1,21 @@
 // Package combined is a self-contained example that combines all three sysgo
-// generators over one bounded context (model.sysml):
+// generators over one bounded context (model.sysml), the way the framework
+// intends: the business logic lives in a single DDD use case, and the REST and
+// Temporal transports are *driving adapters* that both invoke it.
 //
-//   - the DDD core (domain, ports, PlaceOrder use case) under ./internal, from
-//     model.json via `sysgo generate`;
-//   - an OpenAPI entrypoint and a Temporal entrypoint (added in follow-ups) that
-//     natively import and drive that DDD business logic.
+//   - the DDD core — domain, ports, the PlaceOrder use case, and the scaffolded
+//     adapter layer — lives under ./internal, generated from model.json by
+//     `sysgo generate` (generate.adapters: scaffold);
+//   - the REST driving adapter (internal/order/adapter/in/http) implements the
+//     generated api.ServerInterface and drives the PlaceOrder use case;
+//   - the Temporal driving adapter (internal/order/adapter/in/temporal)
+//     implements the generated orders.Activities port and drives the *same* use
+//     case;
+//   - cmd/api and cmd/worker are thin composition roots that wire the in-memory
+//     repository into the use case and host the gin server / Temporal worker.
 //
-// The DDD core is the business logic; OpenAPI and Temporal are just transports
-// over it. Regenerate the DDD core after editing the model with:
+// The same PlaceOrder use case therefore runs whether an order arrives over HTTP
+// or Temporal (see combined_test.go). Regenerate after editing the model with:
 //
 //	go generate ./...
 //

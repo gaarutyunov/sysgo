@@ -1,7 +1,0 @@
-# oapi-codegen configuration for the sysgo-generated OpenAPI document.
-package: api
-output: api/server.gen.go
-generate:
-  gin-server: true
-  models: true
-  strict-server: false

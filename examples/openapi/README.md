@@ -9,9 +9,8 @@ build.
 | Path                 | Origin       | What it is                                                        |
 |----------------------|--------------|-------------------------------------------------------------------|
 | `model.sysml`        | hand-written | The SysML v2 model (a product-catalog REST API) annotated with the `RESTProfile` — the source of truth. |
-| `openapi.yaml`       | generated    | `sysgo gen openapi` output — the OpenAPI 3.1 document. **Do not edit.** |
-| `api/server.gen.go`  | generated    | oapi-codegen output from `openapi.yaml` — types + the gin `ServerInterface`. **Do not edit.** |
-| `oapi-codegen.yaml`  | hand-written | oapi-codegen configuration.                                       |
+| `openapi.yaml`       | generated    | `sysgo gen openapi` output — a **reference** OpenAPI 3.1 document (not the codegen source; the integration test validates against it). **Do not edit.** |
+| `api/server.gen.go`  | generated    | `sysgo gen openapi --server` output — types + the gin `ServerInterface`, generated **directly from the model** (oapi-codegen runs in-process against an in-memory `openapi3.T`). **Do not edit.** |
 | `handlers.go`        | hand-written | `Catalog` — the real implementation behind the generated `api.ServerInterface`. |
 | `main.go`            | hand-written | Server entrypoint: wires the handlers into a gin router (graceful shutdown). |
 | `Dockerfile`         | hand-written | Builds the server with `go build -cover` for the integration test's real-container coverage. |
@@ -19,15 +18,15 @@ build.
 
 ## Regenerating
 
-`openapi.yaml` and `api/server.gen.go` are regenerated from `model.sysml` by the
-in-repo sysgo and oapi-codegen (both wired as `tool` dependencies, sysgo pinned
-to this checkout via a `replace`):
+`api/server.gen.go` and the reference `openapi.yaml` are regenerated from
+`model.sysml` by the in-repo sysgo (wired as a `tool` dependency, pinned to this
+checkout via a `replace`); sysgo runs oapi-codegen in-process as a library:
 
 ```sh
 go generate ./...
 ```
 
-The pipeline is `sysgo gen openapi` → `oapi-codegen`, and its output is
+The Go server is generated in one step by `sysgo gen openapi --server` (no `openapi.yaml` codegen intermediate), and its output is
 byte-for-byte deterministic, so a drift check is just
 `go generate ./... && git diff --exit-code` (see issue #123).
 

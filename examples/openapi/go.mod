@@ -96,7 +96,6 @@ require (
 	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/mod v0.38.0 // indirect
@@ -111,7 +110,4 @@ require (
 
 replace github.com/gaarutyunov/sysgo => ../..
 
-tool (
-	github.com/gaarutyunov/sysgo/cmd/sysgo
-	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
-)
+tool github.com/gaarutyunov/sysgo/cmd/sysgo

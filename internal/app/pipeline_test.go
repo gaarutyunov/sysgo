@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gaarutyunov/sysgo/internal/adapter/gotmpl"
+	"github.com/gaarutyunov/sysgo/internal/adapter/openapi"
 	"github.com/gaarutyunov/sysgo/internal/adapter/osfs"
 	"github.com/gaarutyunov/sysgo/internal/adapter/sysmlfile"
 	"github.com/gaarutyunov/sysgo/internal/app"
@@ -132,5 +133,53 @@ func TestGeneratedCompiles(t *testing.T) {
 	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod")
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("generated project failed to build: %v\n%s", err, b)
+	}
+}
+
+// TestGenerateEmitsContracts wires a ContractEmitter (the OpenAPI adapter) into
+// the pipeline and asserts the emitted openapi.yaml is written alongside the DDD
+// scaffold — the engine↔generate bridge, end to end.
+func TestGenerateEmitsContracts(t *testing.T) {
+	const sysmlSrc = `package API {
+	import ScalarValues::*;
+	import RESTProfile::*;
+	item def Order {
+		attribute id : String;
+	}
+	@REST { path = "/orders"; method = "POST"; successStatus = 201; }
+	action placeOrder {
+		in order : Order;
+	}
+}`
+	sysml := filepath.Join(t.TempDir(), "api.sysml")
+	if err := os.WriteFile(sysml, []byte(sysmlSrc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := t.TempDir()
+	pl := newPipeline(t, orderCfg(), "../../examples/order/model.json")
+	pl.Contracts = openapi.New(sysml)
+
+	res, err := pl.Generate(context.Background(), out)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	var found bool
+	for _, w := range res.Written {
+		if w == "openapi.yaml" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("openapi.yaml not in Written: %v", res.Written)
+	}
+	if _, err := os.Stat(filepath.Join(out, "openapi.yaml")); err != nil {
+		t.Fatalf("openapi.yaml not on disk: %v", err)
+	}
+	// The DDD scaffold must still be emitted (contracts are additive).
+	if _, err := os.Stat(filepath.Join(out, "internal/order/domain/order.go")); err != nil {
+		t.Fatalf("DDD scaffold missing: %v", err)
 	}
 }

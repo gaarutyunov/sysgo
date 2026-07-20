@@ -20,6 +20,9 @@ type Pipeline struct {
 	Builder  port.Builder
 	Renderer port.Renderer
 	Writer   port.FileWriter
+	// Contracts, when non-nil, emits additional contract artifacts (e.g.
+	// openapi.yaml) that are written alongside the DDD scaffold.
+	Contracts port.ContractEmitter // may be nil
 }
 
 // LoadIR runs load → overlay → IR build and returns the resolved IR project.
@@ -54,6 +57,13 @@ func (p *Pipeline) Generate(ctx context.Context, root string) (port.WriteResult,
 	files, err := p.Renderer.Render(proj)
 	if err != nil {
 		return port.WriteResult{}, fmt.Errorf("render: %w", err)
+	}
+	if p.Contracts != nil {
+		contractFiles, err := p.Contracts.Emit(ctx)
+		if err != nil {
+			return port.WriteResult{}, fmt.Errorf("contracts: %w", err)
+		}
+		files = append(files, contractFiles...)
 	}
 	res, err := p.Writer.Write(root, files)
 	if err != nil {

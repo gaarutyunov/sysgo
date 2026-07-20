@@ -242,7 +242,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           cache-dependency-path: examples/openapi/go.sum
-      - name: Regenerate the example from the model (sysgo gen openapi + oapi-codegen)
+      - name: Regenerate the example from the model (sysgo gen openapi --server)
         working-directory: examples/openapi
         run: go generate ./...
       - name: Assert committed generated code is sysgo/oapi-codegen output (no drift)
@@ -254,7 +254,7 @@ jobs:
             git diff -- examples/openapi/openapi.yaml examples/openapi/api
             exit 1
           fi
-          echo "No drift: committed openapi.yaml and api/ match sysgo + oapi-codegen output."
+          echo "No drift: committed openapi.yaml and api/ match sysgo gen openapi output."
 
   examples-combined:
     name: Examples Combined (build + drift)

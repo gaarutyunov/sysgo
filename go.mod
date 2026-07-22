@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/dave/jennifer v1.7.1
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.143.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
